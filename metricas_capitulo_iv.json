@@ -1,0 +1,180 @@
+{
+  "yolo": {
+    "mAP50": 0.659,
+    "mAP50_95": 0.531,
+    "precision": 0.724,
+    "recall": 0.639,
+    "epochs": 30,
+    "best_epoch": 20,
+    "imagenes_train": 8359,
+    "imagenes_val": 945,
+    "clases": 20,
+    "parametros": 2694108,
+    "GFLOPs": 6.963,
+    "speed_ms": 9.065
+  },
+  "yolo_por_clase": {
+    "T-shirt": {
+      "P": 0.805,
+      "R": 0.851,
+      "mAP50": 0.913
+    },
+    "blazer": {
+      "P": 0.228,
+      "R": 0.615,
+      "mAP50": 0.621
+    },
+    "blouse": {
+      "P": 1.0,
+      "R": 0.0,
+      "mAP50": 0.079
+    },
+    "body": {
+      "P": 0.649,
+      "R": 0.533,
+      "mAP50": 0.65
+    },
+    "dress": {
+      "P": 0.686,
+      "R": 0.544,
+      "mAP50": 0.639
+    },
+    "hat": {
+      "P": 0.955,
+      "R": 0.848,
+      "mAP50": 0.902
+    },
+    "hoodie": {
+      "P": 0.71,
+      "R": 0.584,
+      "mAP50": 0.678
+    },
+    "long sleeve": {
+      "P": 0.682,
+      "R": 0.776,
+      "mAP50": 0.815
+    },
+    "not sure": {
+      "P": 0.516,
+      "R": 0.233,
+      "mAP50": 0.27
+    },
+    "other": {
+      "P": 1.0,
+      "R": 0.0,
+      "mAP50": 0.051
+    },
+    "outwear": {
+      "P": 0.607,
+      "R": 0.779,
+      "mAP50": 0.785
+    },
+    "pants": {
+      "P": 0.983,
+      "R": 0.882,
+      "mAP50": 0.944
+    },
+    "polo": {
+      "P": 0.837,
+      "R": 0.769,
+      "mAP50": 0.781
+    },
+    "shirt": {
+      "P": 0.704,
+      "R": 0.685,
+      "mAP50": 0.77
+    },
+    "shoe": {
+      "P": 0.853,
+      "R": 0.921,
+      "mAP50": 0.941
+    },
+    "shorts": {
+      "P": 0.697,
+      "R": 0.867,
+      "mAP50": 0.873
+    },
+    "skirt": {
+      "P": 0.915,
+      "R": 0.806,
+      "mAP50": 0.837
+    },
+    "top": {
+      "P": 0.106,
+      "R": 0.833,
+      "mAP50": 0.201
+    },
+    "undershirt": {
+      "P": 0.826,
+      "R": 0.62,
+      "mAP50": 0.777
+    }
+  },
+  "color": {
+    "accuracy": 0.9808,
+    "total_muestras": 52,
+    "correctas": 51,
+    "colores": {
+      "negro": {
+        "correctos": 4,
+        "total": 4
+      },
+      "blanco": {
+        "correctos": 4,
+        "total": 4
+      },
+      "gris": {
+        "correctos": 3,
+        "total": 4
+      },
+      "rojo": {
+        "correctos": 4,
+        "total": 4
+      },
+      "azul": {
+        "correctos": 4,
+        "total": 4
+      },
+      "verde": {
+        "correctos": 4,
+        "total": 4
+      },
+      "amarillo": {
+        "correctos": 4,
+        "total": 4
+      },
+      "naranja": {
+        "correctos": 4,
+        "total": 4
+      },
+      "morado": {
+        "correctos": 4,
+        "total": 4
+      },
+      "beige": {
+        "correctos": 4,
+        "total": 4
+      },
+      "rosa": {
+        "correctos": 4,
+        "total": 4
+      },
+      "azul marino": {
+        "correctos": 4,
+        "total": 4
+      },
+      "cafe": {
+        "correctos": 4,
+        "total": 4
+      }
+    }
+  },
+  "recomendador": {
+    "pares_reales": 316,
+    "imagenes_fuente": 2909,
+    "n_dims": 40,
+    "score_compatibles": 0.3631,
+    "score_no_compatibles": 0.3861,
+    "separacion": -0.023
+  }
+}
