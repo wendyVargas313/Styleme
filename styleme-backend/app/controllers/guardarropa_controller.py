@@ -1,9 +1,11 @@
 # StyleMe - Controlador de Guardarropa
+import io
 import logging
 import os
 import uuid
 from pathlib import Path
 from datetime import datetime
+from PIL import Image
 from bson import ObjectId
 from fastapi import HTTPException, status, UploadFile
 
@@ -53,6 +55,65 @@ async def validar_imagen(imagen: UploadFile) -> bytes:
     return contenido
 
 
+def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float = 0.12) -> bytes:
+    """
+    Recorta la prenda detectada por YOLO, elimina el fondo
+    con rembg y la centra sobre fondo blanco 512x512.
+
+    Flujo:
+    1. Abrir imagen original
+    2. Recortar bbox de YOLO con margen
+    3. Quitar fondo con rembg (imagen RGBA con transparencia)
+    4. Pegar sobre fondo blanco 512x512
+    """
+    from rembg import remove as rembg_remove
+
+    # Paso 1: abrir imagen
+    img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+
+    # Paso 2: recortar bbox de YOLO con margen
+    if bbox and len(bbox) == 4:
+        x1, y1, x2, y2 = [int(v) for v in bbox]
+        pad_x = int((x2 - x1) * padding_pct)
+        pad_y = int((y2 - y1) * padding_pct)
+        x1 = max(0, x1 - pad_x)
+        y1 = max(0, y1 - pad_y)
+        x2 = min(img.width, x2 + pad_x)
+        y2 = min(img.height, y2 + pad_y)
+        img = img.crop((x1, y1, x2, y2))
+
+    # Paso 3: quitar fondo con rembg
+    # rembg recibe bytes PNG y devuelve imagen PNG con canal alpha
+    try:
+        buf_entrada = io.BytesIO()
+        img.save(buf_entrada, format="PNG")
+        buf_entrada.seek(0)
+
+        resultado_bytes = rembg_remove(buf_entrada.read())
+        img_sin_fondo = Image.open(io.BytesIO(resultado_bytes)).convert("RGBA")
+
+    except Exception as e:
+        # Si rembg falla, usar imagen recortada sin quitar fondo
+        logger.warning(f"rembg falló, usando recorte simple: {e}")
+        img_sin_fondo = img.convert("RGBA")
+
+    # Paso 4: centrar sobre fondo blanco 512x512
+    size = 512
+    fondo = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+    img_sin_fondo.thumbnail((size, size), Image.LANCZOS)
+    offset_x = (size - img_sin_fondo.width) // 2
+    offset_y = (size - img_sin_fondo.height) // 2
+
+    # Pegar usando el canal alpha como máscara para bordes suaves
+    fondo.paste(img_sin_fondo, (offset_x, offset_y), mask=img_sin_fondo.split()[3])
+
+    # Convertir a RGB y guardar como JPEG
+    fondo_rgb = fondo.convert("RGB")
+    buf_salida = io.BytesIO()
+    fondo_rgb.save(buf_salida, format="JPEG", quality=92)
+    return buf_salida.getvalue()
+
+
 async def guardar_imagen_local(
     contenido: bytes,
     usuario_id: str,
@@ -69,9 +130,8 @@ async def guardar_imagen_local(
     directorio_usuario = Path(settings.UPLOADS_PATH) / usuario_id
     directorio_usuario.mkdir(parents=True, exist_ok=True)
 
-    # Generar nombre único para la imagen
-    extension = Path(nombre_original).suffix.lower() or ".jpg"
-    nombre_archivo = f"prenda_{uuid.uuid4().hex[:12]}{extension}"
+    # Generar nombre único para la imagen (siempre .jpg tras el procesado)
+    nombre_archivo = f"prenda_{uuid.uuid4().hex[:12]}.jpg"
     ruta_completa = directorio_usuario / nombre_archivo
 
     # Guardar imagen
@@ -108,12 +168,17 @@ async def agregar_prenda(
     tipo = resultado_ml.get("tipo", "other")
     color = resultado_ml.get("color", "negro")
     confianza = resultado_ml.get("confianza", 0.0)
+    bbox = resultado_ml.get("bbox", [])
 
     logger.info(f"   Tipo detectado: {tipo} ({confianza:.1%})")
     logger.info(f"   Color detectado: {color}")
 
-    # Guardar imagen localmente
-    imagen_url = await guardar_imagen_local(imagen_bytes, usuario_id, nombre_imagen)
+    # Recortar prenda y colocar en tarjeta fondo blanco
+    imagen_tarjeta = generar_imagen_tarjeta(imagen_bytes, bbox)
+    logger.info("   Imagen procesada: recorte + fondo blanco 512x512")
+
+    # Guardar imagen procesada localmente
+    imagen_url = await guardar_imagen_local(imagen_tarjeta, usuario_id, nombre_imagen)
 
     # Crear documento de prenda
     nueva_prenda = PrendaModel.crear(

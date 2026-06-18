@@ -7,6 +7,7 @@ import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
 import 'package:styleme/views/guardarropa/detalle_prenda_screen.dart';
+import 'package:styleme/widgets/glass_kit.dart';
 import 'package:styleme/widgets/prenda_card.dart';
 
 class GuardarropaScreen extends StatefulWidget {
@@ -31,20 +32,8 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
 
     return Scaffold(
       backgroundColor: StyleMeTheme.background,
-      appBar: AppBar(
-        backgroundColor: StyleMeTheme.background,
-        title: Column(
-          children: [
-            Text(
-              'Mi Armario',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Text(
-              '${ctrl.totalPrendas} prendas',
-              style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12),
-            ),
-          ],
-        ),
+      appBar: GlassAppBar(
+        title: 'Mi Armario',
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart, color: StyleMeTheme.primary),
@@ -56,18 +45,33 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
       body: Column(
         children: [
           // Filtros horizontales
-          _buildFiltros(ctrl),
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 60),
+            child: _buildFiltros(ctrl),
+          ),
           // Grid de prendas
-          Expanded(child: _buildGrid(ctrl)),
+          Expanded(
+            child: FadeSlideIn(
+              delay: const Duration(milliseconds: 120),
+              child: _buildGrid(ctrl),
+            ),
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.pushNamed(context, AppRoutes.agregarPrenda);
-          if (mounted) ctrl.cargarPrendas(resetear: true);
-        },
-        backgroundColor: StyleMeTheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: Container(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: StyleMeTheme.naranjaGlow,
+        ),
+        child: FloatingActionButton(
+          onPressed: () async {
+            await Navigator.pushNamed(context, AppRoutes.agregarPrenda);
+            if (mounted) ctrl.cargarPrendas(resetear: true);
+          },
+          backgroundColor: StyleMeTheme.primary,
+          elevation: 0,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }

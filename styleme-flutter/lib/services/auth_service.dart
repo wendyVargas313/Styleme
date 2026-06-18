@@ -1,4 +1,6 @@
 // StyleMe - Servicio de Autenticación
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:styleme/config/api_config.dart';
 import 'package:styleme/models/user_model.dart';
 import 'package:styleme/services/api_service.dart';
@@ -56,5 +58,18 @@ class AuthService {
 
   Future<void> cerrarSesion() async {
     await _storage.cerrarSesion();
+  }
+
+  // Sube la foto de perfil como multipart y retorna la URL guardada
+  Future<String> subirFotoPerfil(File foto) async {
+    final formData = FormData.fromMap({
+      'foto': await MultipartFile.fromFile(
+        foto.path,
+        filename: 'perfil.jpg',
+      ),
+    });
+    final response = await _api.postFormData(ApiConfig.fotoPerfil, formData);
+    final data = response.data as Map<String, dynamic>;
+    return data['foto_perfil_url'] as String;
   }
 }

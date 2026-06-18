@@ -10,7 +10,7 @@ import 'package:styleme/controllers/recomendacion_controller.dart';
 import 'package:styleme/models/prenda_model.dart';
 import 'package:styleme/widgets/custom_button.dart';
 import 'package:styleme/widgets/loading_widget.dart';
-import 'package:styleme/widgets/outfit_card.dart';
+import 'package:styleme/widgets/outfit_visual_card.dart';
 import 'package:styleme/widgets/prenda_card.dart';
 
 class RecomendacionScreen extends StatefulWidget {
@@ -142,21 +142,44 @@ class _RecomendacionScreenState extends State<RecomendacionScreen> {
                 icono: Icons.auto_awesome,
               ),
 
-              // Resultado del outfit
-              if (recCtrl.outfitActual != null) ...[
-                const SizedBox(height: 28),
-                Text(
-                  'Tu outfit',
-                  style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
+              // Resultado del outfit con animación slide-up
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 450),
+                transitionBuilder: (child, animation) => SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.12),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  )),
+                  child: FadeTransition(opacity: animation, child: child),
                 ),
-                const SizedBox(height: 12),
-                OutfitCard(
-                  outfit: recCtrl.outfitActual!,
-                  onLike: () => _darFeedback(context, recCtrl.outfitActual!.id, 'liked'),
-                  onSave: () => _darFeedback(context, recCtrl.outfitActual!.id, 'saved'),
-                  onDislike: () => _darFeedback(context, recCtrl.outfitActual!.id, 'disliked'),
-                ),
-              ],
+                child: recCtrl.outfitActual != null
+                    ? Column(
+                        key: ValueKey(recCtrl.outfitActual!.id),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 28),
+                          Text(
+                            'Tu outfit',
+                            style: GoogleFonts.poppins(
+                              color: StyleMeTheme.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          OutfitVisualCard.fromOutfitModel(
+                            outfit: recCtrl.outfitActual!,
+                            onFeedback: (tipo) =>
+                                _darFeedback(context, recCtrl.outfitActual!.id, tipo),
+                            titulo: 'Tu outfit de hoy',
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(key: ValueKey('empty')),
+              ),
 
               // Error
               if (recCtrl.estado == RecomendacionEstado.error && recCtrl.mensajeError != null)

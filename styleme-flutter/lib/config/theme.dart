@@ -50,6 +50,22 @@ class StyleMeTheme {
     ),
   ];
 
+  // Glow naranja premium (para botones y elementos destacados)
+  static const List<BoxShadow> naranjaGlow = [
+    BoxShadow(color: Color(0x33FF6B00), blurRadius: 20, spreadRadius: 2, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x1AFF6B00), blurRadius: 40),
+  ];
+
+  // Decoración tipo glass (sin BackdropFilter, para uso rápido)
+  static BoxDecoration glassCardDecoration({double radius = 16}) => BoxDecoration(
+    color: Colors.white.withValues(alpha: 0.07),
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1),
+    boxShadow: [
+      BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4)),
+    ],
+  );
+
   // ── Tema principal ────────────────────────────────────
   static ThemeData get tema {
     return ThemeData(

@@ -1,6 +1,7 @@
 // StyleMe - Controller de Recomendaciones (Provider)
 import 'package:flutter/foundation.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/models/outfit_ia_model.dart';
 import 'package:styleme/models/outfit_model.dart';
 import 'package:styleme/models/prenda_model.dart';
 import 'package:styleme/services/api_service.dart';
@@ -10,16 +11,29 @@ enum RecomendacionEstado { inicial, cargando, listo, error }
 class RecomendacionController extends ChangeNotifier {
   final ApiService _api = ApiService();
 
+  // ── Estado outfits diarios ──────────────────────────────────
   RecomendacionEstado _estado = RecomendacionEstado.inicial;
   OutfitModel? _outfitActual;
   List<OutfitModel> _outfitsDelDia = [];
   String? _mensajeError;
+
+  // ── Estado outfits IA ───────────────────────────────────────
+  List<OutfitIAModel> _outfitsIA = [];
+  bool _generandoIA = false;
+  bool _sinFotoPerfil = false;
+  String? _errorIA;
 
   RecomendacionEstado get estado => _estado;
   OutfitModel? get outfitActual => _outfitActual;
   List<OutfitModel> get outfitsDelDia => _outfitsDelDia;
   String? get mensajeError => _mensajeError;
   bool get estaCargando => _estado == RecomendacionEstado.cargando;
+
+  // Getters IA
+  List<OutfitIAModel> get outfitsIA => _outfitsIA;
+  bool get generandoIA => _generandoIA;
+  bool get sinFotoPerfil => _sinFotoPerfil;
+  String? get errorIA => _errorIA;
 
   // Genera outfit basado en una prenda seleccionada
   Future<OutfitModel?> generarOutfit({
@@ -104,6 +118,36 @@ class RecomendacionController extends ChangeNotifier {
       _estado = RecomendacionEstado.error;
     }
     notifyListeners();
+  }
+
+  // Genera outfits del día con imagen IA via CatVTON
+  Future<void> cargarOutfitsIA({String temporada = 'invierno'}) async {
+    if (_generandoIA) return; // Evitar llamadas duplicadas
+    _generandoIA = true;
+    _sinFotoPerfil = false;
+    _errorIA = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(
+        ApiConfig.outfitsIA,
+        data: {'temporada': temporada},
+      );
+      final data = response.data as Map<String, dynamic>;
+      _outfitsIA = (data['outfits_ia'] as List? ?? [])
+          .map((o) => OutfitIAModel.fromJson(o as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('400') && msg.contains('foto de perfil')) {
+        _sinFotoPerfil = true;
+      } else {
+        _errorIA = 'No se pudieron generar outfits con IA';
+      }
+    } finally {
+      _generandoIA = false;
+      notifyListeners();
+    }
   }
 
   void limpiarOutfit() {

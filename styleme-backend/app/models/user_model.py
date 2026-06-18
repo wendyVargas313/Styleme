@@ -25,6 +25,7 @@ class UserModel:
             "genero": genero,
             "activo": True,
             "total_outfits_generados": 0,
+            "foto_perfil_url": None,
             "creado_en": datetime.utcnow(),
             "ultimo_acceso": datetime.utcnow()
         }
@@ -41,6 +42,7 @@ class UserModel:
             "genero": doc.get("genero", "otro"),
             "activo": doc.get("activo", True),
             "total_outfits_generados": doc.get("total_outfits_generados", 0),
+            "foto_perfil_url": doc.get("foto_perfil_url", None),
             "creado_en": doc.get("creado_en", datetime.utcnow()).isoformat(),
             "ultimo_acceso": doc.get("ultimo_acceso", datetime.utcnow()).isoformat()
         }

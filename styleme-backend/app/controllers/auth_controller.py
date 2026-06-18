@@ -1,10 +1,15 @@
 # StyleMe - Controlador de Autenticación
+import io
 import logging
+import uuid
 from datetime import datetime
+from pathlib import Path
 from bson import ObjectId
 from fastapi import HTTPException, status
 from passlib.context import CryptContext
+from PIL import Image
 
+from app.config.settings import settings
 from app.models.user_model import UserModel
 from app.schemas.user_schema import RegistroRequest, LoginRequest
 from app.middleware.auth_middleware import crear_token
@@ -148,5 +153,60 @@ async def obtener_perfil(usuario: dict, db) -> dict:
         "genero": usuario.get("genero", "otro"),
         "total_prendas": total_prendas,
         "total_outfits_generados": usuario.get("total_outfits_generados", 0),
+        "foto_perfil_url": usuario.get("foto_perfil_url", None),
         "creado_en": usuario.get("creado_en", datetime.utcnow()).isoformat()
     }
+
+
+async def subir_foto_perfil(usuario: dict, imagen_bytes: bytes, db) -> dict:
+    """
+    Guarda la foto de perfil del usuario en disco y actualiza MongoDB.
+
+    Proceso:
+    1. Convertir imagen a JPEG 512x512
+    2. Guardar en /uploads/{usuario_id}/perfil.jpg (sobreescribe)
+    3. Actualizar foto_perfil_url en MongoDB
+
+    Returns:
+        dict con ok y foto_perfil_url
+    """
+    usuario_id = str(usuario["_id"])
+
+    # Convertir imagen a JPEG cuadrado 512x512
+    try:
+        img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+        # Recorte centrado para mantener proporción
+        lado = min(img.width, img.height)
+        left = (img.width - lado) // 2
+        top = (img.height - lado) // 2
+        img = img.crop((left, top, left + lado, top + lado))
+        img = img.resize((512, 512), Image.LANCZOS)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Imagen no válida: {e}")
+
+    # Guardar en /uploads/{usuario_id}/perfil.jpg
+    directorio = Path(settings.UPLOADS_PATH) / usuario_id
+    directorio.mkdir(parents=True, exist_ok=True)
+    ruta = directorio / "perfil.jpg"
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92)
+    ruta.write_bytes(buf.getvalue())
+
+    foto_perfil_url = f"/uploads/{usuario_id}/perfil.jpg"
+
+    # Actualizar MongoDB
+    await db.usuarios.update_one(
+        {"_id": usuario["_id"]},
+        {"$set": {"foto_perfil_url": foto_perfil_url}}
+    )
+
+    logger.info(f"Foto de perfil actualizada: {usuario_id}")
+    return {"ok": True, "foto_perfil_url": foto_perfil_url}
+
+
+async def obtener_foto_perfil(usuario: dict) -> dict:
+    """
+    Retorna la URL de la foto de perfil del usuario (o null si no tiene).
+    """
+    return {"foto_perfil_url": usuario.get("foto_perfil_url", None)}

@@ -46,7 +46,7 @@ class CustomButton extends StatelessWidget {
                 colors: [Color(0xFF555555), Color(0xFF444444)],
               ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: onPressed != null && !cargando ? StyleMeTheme.sombraNaranja : [],
+        boxShadow: onPressed != null && !cargando ? StyleMeTheme.naranjaGlow : [],
       ),
       child: Material(
         color: Colors.transparent,

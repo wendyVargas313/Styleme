@@ -7,7 +7,8 @@ from app.middleware.auth_middleware import get_usuario_actual
 from app.schemas.outfit_schema import RecomendarOutfitRequest
 from app.controllers.recomendacion_controller import (
     recomendar_outfit,
-    obtener_outfits_diarios
+    obtener_outfits_diarios,
+    generar_outfits_ia,
 )
 
 router = APIRouter(prefix="/recomendar", tags=["Recomendaciones"])
@@ -47,5 +48,23 @@ async def diario(
     return await obtener_outfits_diarios(
         temporada=temporada,
         usuario_id=usuario_id,
+        db=db
+    )
+
+
+@router.post("/outfits-ia", status_code=status.HTTP_200_OK)
+async def outfits_ia(
+    temporada: str = "invierno",
+    usuario_actual=Depends(get_usuario_actual),
+    db=Depends(get_db)
+):
+    """
+    Genera 3 outfits del día y para cada uno llama a CatVTON
+    con la foto de perfil del usuario para producir la imagen IA.
+    Requiere que el usuario haya subido su foto de perfil.
+    """
+    return await generar_outfits_ia(
+        usuario=usuario_actual,
+        temporada=temporada,
         db=db
     )

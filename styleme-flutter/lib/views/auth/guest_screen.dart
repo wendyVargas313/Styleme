@@ -13,6 +13,7 @@ import 'package:styleme/services/api_service.dart';
 import 'package:styleme/services/image_service.dart';
 import 'package:styleme/widgets/custom_button.dart';
 import 'package:styleme/widgets/loading_widget.dart';
+import 'package:styleme/widgets/outfit_visual_card.dart';
 
 class GuestScreen extends StatefulWidget {
   const GuestScreen({super.key});
@@ -243,28 +244,142 @@ class _GuestScreenState extends State<GuestScreen> {
   }
 
   Widget _buildResultado() {
-    final prendas = _resultado!['prendas_detectadas'] as List? ?? [];
-    final mensaje = _resultado!['mensaje'] ?? '';
+    final prendas = (_resultado!['prendas_detectadas'] as List? ?? []).cast<Map<String, dynamic>>();
+    final outfitPrueba = _resultado!['outfit_prueba'] as Map<String, dynamic>?;
+
+    // Construir maps para OutfitVisualCard con archivos locales como imágenes
+    Map<String, dynamic> prendaBase = {};
+    List<Map<String, dynamic>> complementos = [];
+
+    if (outfitPrueba != null) {
+      final baseData = outfitPrueba['prenda_base'] as Map<String, dynamic>? ?? {};
+      prendaBase = {
+        'tipo': baseData['tipo'] ?? '',
+        'color': baseData['color'] ?? '',
+        'confianza': (baseData['confianza'] ?? 0.0).toDouble(),
+        'imagen_url': _imagenes.isNotEmpty ? _imagenes[0].path : '',
+      };
+
+      final compsRaw = outfitPrueba['complementos'] as List? ?? [];
+      int imgIdx = 1;
+      for (final c in compsRaw) {
+        final cMap = c as Map<String, dynamic>;
+        final pData = cMap['prenda'] as Map<String, dynamic>? ?? cMap;
+        complementos.add({
+          'tipo': pData['tipo'] ?? '',
+          'color': pData['color'] ?? '',
+          'score': ((cMap['score'] ?? pData['confianza'] ?? 0.0) as num).toDouble(),
+          'imagen_url': imgIdx < _imagenes.length ? _imagenes[imgIdx].path : '',
+        });
+        imgIdx++;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Título
         Text(
-          '${prendas.length} prendas detectadas',
+          'Tu outfit StyleMe ✨',
           style: GoogleFonts.poppins(
             color: StyleMeTheme.textPrimary,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Basado en ${prendas.length} prenda${prendas.length != 1 ? 's' : ''} detectada${prendas.length != 1 ? 's' : ''}',
+          style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13),
+        ),
         const SizedBox(height: 16),
-        ...prendas.map((p) => _prendaDetectada(p as Map<String, dynamic>)),
-        const SizedBox(height: 24),
+
+        // Grid de imágenes subidas con chips de detección
+        if (_imagenes.isNotEmpty) ...[          
+          Text(
+            'Prendas analizadas',
+            style: GoogleFonts.poppins(
+              color: StyleMeTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 88,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _imagenes.length,
+              itemBuilder: (_, i) {
+                final p = i < prendas.length ? prendas[i] : null;
+                final conf = ((p?['confianza'] ?? 0.0) as num) * 100;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          _imagenes[i],
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      if (p != null)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.72),
+                              borderRadius: const BorderRadius.vertical(
+                                  bottom: Radius.circular(10)),
+                            ),
+                            child: Text(
+                              '${p['tipo']} • ${conf.toStringAsFixed(0)}%',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // OutfitVisualCard
+        if (prendaBase.isNotEmpty)
+          OutfitVisualCard(
+            prendaBase: prendaBase,
+            complementos: complementos,
+            titulo: 'Tu outfit de hoy',
+          )
+        else
+          ...prendas.map((p) => _prendaDetectada(p)),
+
+        const SizedBox(height: 20),
+
+        // CTA Banner
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [StyleMeTheme.primary.withValues(alpha: 0.15), StyleMeTheme.primaryDark.withValues(alpha: 0.1)],
+              colors: [
+                StyleMeTheme.primary.withValues(alpha: 0.14),
+                StyleMeTheme.primaryDark.withValues(alpha: 0.07),
+              ],
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: StyleMeTheme.primary.withValues(alpha: 0.3)),
@@ -281,8 +396,9 @@ class _GuestScreenState extends State<GuestScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                mensaje,
-                style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13),
+                'Crea tu cuenta gratis para guardar tus outfits y acceder a todas las funciones',
+                style: GoogleFonts.poppins(
+                    color: StyleMeTheme.textSecondary, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -291,15 +407,31 @@ class _GuestScreenState extends State<GuestScreen> {
                 onPressed: () => Navigator.pushNamed(context, AppRoutes.registro),
                 icono: Icons.person_add,
               ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => setState(() {
+                  _resultado = null;
+                  _imagenes = [];
+                }),
+                child: Text(
+                  'Seguir explorando',
+                  style: GoogleFonts.poppins(
+                    color: StyleMeTheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
+        const SizedBox(height: 24),
       ],
     );
   }
 
   Widget _prendaDetectada(Map<String, dynamic> p) {
-    final confianza = ((p['confianza'] ?? 0.0) * 100).toStringAsFixed(0);
+    final confianza = (((p['confianza'] ?? 0.0) as num) * 100).toStringAsFixed(0);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -317,18 +449,24 @@ class _GuestScreenState extends State<GuestScreen> {
               children: [
                 Text(
                   p['tipo'] ?? '',
-                  style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                      color: StyleMeTheme.textPrimary,
+                      fontWeight: FontWeight.w600),
                 ),
                 Text(
                   '${p['color']} • ${p['temporada']}',
-                  style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12),
+                  style: GoogleFonts.poppins(
+                      color: StyleMeTheme.textSecondary, fontSize: 12),
                 ),
               ],
             ),
           ),
           Text(
             '$confianza%',
-            style: GoogleFonts.poppins(color: StyleMeTheme.primary, fontWeight: FontWeight.w700, fontSize: 15),
+            style: GoogleFonts.poppins(
+                color: StyleMeTheme.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 15),
           ),
         ],
       ),

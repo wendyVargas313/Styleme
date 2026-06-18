@@ -1,12 +1,15 @@
 // StyleMe - Pantalla de Perfil de Usuario
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:styleme/app/routes.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/auth_controller.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
 import 'package:styleme/controllers/historial_controller.dart';
+import 'package:styleme/widgets/glass_kit.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -16,12 +19,67 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
+  bool _subiendoFoto = false;
+  static const _naranja = Color(0xFFFF6B00);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthController>().refrescarPerfil();
     });
+  }
+
+  Future<void> _seleccionarFoto() async {
+    final picker = ImagePicker();
+    final opcion = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: StyleMeTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Seleccionar foto',
+                style: GoogleFonts.poppins(
+                    color: StyleMeTheme.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: _naranja),
+              title: Text('Cámara',
+                  style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: _naranja),
+              title: Text('Galería',
+                  style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (opcion == null || !mounted) return;
+
+    final picked = await picker.pickImage(source: opcion, imageQuality: 90);
+    if (picked == null || !mounted) return;
+
+    setState(() => _subiendoFoto = true);
+    final ok = await context.read<AuthController>().subirFotoPerfil(File(picked.path));
+    if (!mounted) return;
+    setState(() => _subiendoFoto = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Foto actualizada' : 'Error al subir la foto'),
+      backgroundColor: ok ? _naranja : StyleMeTheme.error,
+    ));
   }
 
   @override
@@ -33,9 +91,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
     return Scaffold(
       backgroundColor: StyleMeTheme.background,
-      appBar: AppBar(
-        backgroundColor: StyleMeTheme.background,
-        title: Text('Perfil', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+      appBar: GlassAppBar(
+        title: 'Perfil',
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: StyleMeTheme.error),
@@ -49,27 +106,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
         child: Column(
           children: [
             // Avatar y nombre
-            Container(
-              width: double.infinity,
+            FadeSlideIn(
+             child: GlassCard(
+              radius: 20,
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [StyleMeTheme.card, StyleMeTheme.surface],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
               child: Column(
                 children: [
                   // Avatar con inicial
                   Container(
                     width: 80,
                     height: 80,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       gradient: StyleMeTheme.gradientePrimario,
                       shape: BoxShape.circle,
-                      boxShadow: StyleMeTheme.sombraNaranja,
+                      boxShadow: StyleMeTheme.naranjaGlow,
                     ),
                     child: Center(
                       child: Text(
@@ -102,43 +152,62 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   ),
                 ],
               ),
+             ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Sección: Mi foto para Try-On
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 80),
+              child: _buildSeccionFoto(authCtrl),
             ),
 
             const SizedBox(height: 20),
 
             // Estadísticas
-            Row(
-              children: [
-                Expanded(child: _statCard('Prendas', '${guardCtrl.totalPrendas}', Icons.checkroom)),
-                const SizedBox(width: 12),
-                Expanded(child: _statCard('Outfits', '${usuario?.totalOutfitsGenerados ?? 0}', Icons.auto_awesome)),
-                const SizedBox(width: 12),
-                Expanded(child: _statCard('Guardados', '${_contarGuardados(histCtrl)}', Icons.bookmark)),
-              ],
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 140),
+              child: Row(
+                children: [
+                  Expanded(child: _statCard('Prendas', '${guardCtrl.totalPrendas}', Icons.checkroom)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statCard('Outfits', '${usuario?.totalOutfitsGenerados ?? 0}', Icons.auto_awesome)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statCard('Guardados', '${_contarGuardados(histCtrl)}', Icons.bookmark)),
+                ],
+              ),
             ),
 
             const SizedBox(height: 20),
 
             // Opciones del perfil
-            _opcionCard(
-              'Mi armario',
-              Icons.checkroom_outlined,
-              subtitulo: '${guardCtrl.totalPrendas} prendas',
-              onTap: () {},
-            ),
-            const SizedBox(height: 10),
-            _opcionCard(
-              'Historial de outfits',
-              Icons.history_outlined,
-              subtitulo: '${histCtrl.total} outfits generados',
-              onTap: () {},
-            ),
-            const SizedBox(height: 10),
-            _opcionCard(
-              'Acerca de StyleMe',
-              Icons.info_outline,
-              subtitulo: 'Trabajo de Grado - UMB',
-              onTap: () => _mostrarAcercaDe(context),
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 200),
+              child: Column(
+                children: [
+                  _opcionCard(
+                    'Mi armario',
+                    Icons.checkroom_outlined,
+                    subtitulo: '${guardCtrl.totalPrendas} prendas',
+                    onTap: () {},
+                  ),
+                  const SizedBox(height: 10),
+                  _opcionCard(
+                    'Historial de outfits',
+                    Icons.history_outlined,
+                    subtitulo: '${histCtrl.total} outfits generados',
+                    onTap: () {},
+                  ),
+                  const SizedBox(height: 10),
+                  _opcionCard(
+                    'Acerca de StyleMe',
+                    Icons.info_outline,
+                    subtitulo: 'Trabajo de Grado - UMB',
+                    onTap: () => _mostrarAcercaDe(context),
+                  ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 28),
@@ -171,15 +240,163 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Widget _statCard(String label, String valor, IconData icono) {
+  Widget _buildSeccionFoto(AuthController authCtrl) {
+    final fotoUrl = authCtrl.fotoPerfilUrlCompleta;
+    final tieneFoto = fotoUrl != null;
+
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: StyleMeTheme.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: tieneFoto
+              ? _naranja.withValues(alpha: 0.4)
+              : StyleMeTheme.primary.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Avatar circular con foto o placeholder
+          GestureDetector(
+            onTap: _subiendoFoto ? null : _seleccionarFoto,
+            child: Stack(
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: tieneFoto ? _naranja : StyleMeTheme.primary.withValues(alpha: 0.3),
+                      width: tieneFoto ? 2.5 : 1.5,
+                    ),
+                    color: StyleMeTheme.surface,
+                  ),
+                  child: ClipOval(
+                    child: tieneFoto
+                        ? Image.network(
+                            fotoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.person,
+                              color: StyleMeTheme.textSecondary,
+                              size: 36,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            color: StyleMeTheme.textSecondary,
+                            size: 36,
+                          ),
+                  ),
+                ),
+                // Indicador de carga sobre el avatar
+                if (_subiendoFoto)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(_naranja),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          // Texto y botón
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mi foto para Try-On',
+                  style: GoogleFonts.poppins(
+                    color: StyleMeTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  tieneFoto
+                      ? 'Usada para el virtual try-on'
+                      : 'Necesaria para el virtual try-on',
+                  style: GoogleFonts.poppins(
+                    color: StyleMeTheme.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _subiendoFoto ? null : _seleccionarFoto,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: _subiendoFoto
+                          ? _naranja.withValues(alpha: 0.4)
+                          : _naranja,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tieneFoto ? Icons.edit : Icons.add_a_photo,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          tieneFoto ? 'Cambiar foto' : 'Agregar mi foto',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String valor, IconData icono) {
+    return GlassCard(
+      radius: 14,
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(color: StyleMeTheme.card, borderRadius: BorderRadius.circular(14)),
       child: Column(
         children: [
-          Icon(icono, color: StyleMeTheme.primary, size: 22),
-          const SizedBox(height: 6),
-          Text(valor, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: StyleMeTheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icono, color: StyleMeTheme.primary, size: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(valor, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
           Text(label, style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 11)),
         ],
       ),
@@ -187,32 +404,30 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _opcionCard(String titulo, IconData icono, {String? subtitulo, VoidCallback? onTap}) {
-    return GestureDetector(
+    return GlassCard(
+      radius: 14,
+      padding: const EdgeInsets.all(16),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: StyleMeTheme.card, borderRadius: BorderRadius.circular(14)),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: StyleMeTheme.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icono, color: StyleMeTheme.primary, size: 20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: StyleMeTheme.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icono, color: StyleMeTheme.primary, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontWeight: FontWeight.w500)),
+                if (subtitulo != null)
+                  Text(subtitulo, style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12)),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(titulo, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontWeight: FontWeight.w500)),
-                  if (subtitulo != null)
-                    Text(subtitulo, style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: StyleMeTheme.textSecondary, size: 18),
-          ],
-        ),
+          ),
+          const Icon(Icons.chevron_right, color: StyleMeTheme.textSecondary, size: 18),
+        ],
       ),
     );
   }

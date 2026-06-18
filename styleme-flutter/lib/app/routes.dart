@@ -8,6 +8,7 @@ import 'package:styleme/views/guardarropa/agregar_prenda_screen.dart';
 import 'package:styleme/views/home/home_screen.dart';
 import 'package:styleme/views/recomendacion/recomendacion_screen.dart';
 import 'package:styleme/views/splash/splash_screen.dart';
+import 'package:styleme/views/tryon/tryon_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -17,6 +18,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String agregarPrenda = '/agregar-prenda';
   static const String recomendacion = '/recomendacion';
+  static const String tryon = '/tryon';
 
   static Map<String, WidgetBuilder> get rutas => {
         splash: (_) => const SplashScreen(),
@@ -30,5 +32,6 @@ class AppRoutes {
           final prenda = ModalRoute.of(ctx)?.settings.arguments as PrendaModel?;
           return RecomendacionScreen(prendaInicial: prenda);
         },
+        tryon: (_) => const TryonScreen(),
       };
 }

@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -19,6 +20,7 @@ from app.views.guardarropa_router import router as guardarropa_router
 from app.views.recomendacion_router import router as recomendacion_router
 from app.views.historial_router import router as historial_router
 from app.views.invitado_router import router as invitado_router
+from app.views.tryon_router import router as tryon_router
 
 # Configurar logging
 logging.basicConfig(
@@ -77,6 +79,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Handler para errores de validación — evita serializar bytes binarios (ej. imágenes)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errores = []
+    for error in exc.errors():
+        err = dict(error)
+        if isinstance(err.get("input"), bytes):
+            err["input"] = f"<binary {len(err['input'])} bytes>"
+        errores.append(err)
+    return JSONResponse(status_code=422, content={"detail": errores})
+
+
 # Handler global para capturar TODOS los errores 500 con traceback
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -103,6 +117,7 @@ app.include_router(guardarropa_router, prefix=PREFIX)
 app.include_router(recomendacion_router, prefix=PREFIX)
 app.include_router(historial_router, prefix=PREFIX)
 app.include_router(invitado_router, prefix=PREFIX)
+app.include_router(tryon_router, prefix=PREFIX)
 
 
 # ─── ENDPOINT DE SALUD ───────────────────────────────────

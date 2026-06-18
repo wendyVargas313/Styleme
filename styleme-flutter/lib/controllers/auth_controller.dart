@@ -1,5 +1,7 @@
 // StyleMe - Controller de Autenticación (Provider)
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:styleme/config/api_config.dart';
 import 'package:styleme/models/user_model.dart';
 import 'package:styleme/services/auth_service.dart';
 import 'package:styleme/services/storage_service.dart';
@@ -98,6 +100,25 @@ class AuthController extends ChangeNotifier {
       notifyListeners();
     } catch (_) {}
   }
+
+  // Sube la foto de perfil y actualiza el usuario en memoria
+  Future<bool> subirFotoPerfil(File foto) async {
+    try {
+      final url = await _authService.subirFotoPerfil(foto);
+      _usuario = _usuario?.copyWith(fotoPerfilUrl: url);
+      await _storage.guardarUsuario(_usuario!);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _mensajeError = 'Error subiendo foto: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Obtiene la URL completa de la foto de perfil del usuario actual
+  String? get fotoPerfilUrlCompleta =>
+      _usuario?.fotoPerfilUrlCompleta(ApiConfig.baseUrl);
 
   // Cerrar sesión
   Future<void> cerrarSesion() async {

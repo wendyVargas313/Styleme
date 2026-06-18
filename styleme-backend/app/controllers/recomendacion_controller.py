@@ -1,14 +1,26 @@
 # StyleMe - Controlador de Recomendaciones de Outfits
 import logging
 from datetime import datetime, date
+from pathlib import Path
 from bson import ObjectId
 from fastapi import HTTPException, status
 
+from app.config.settings import settings
 from app.models.prenda_model import PrendaModel
 from app.models.outfit_model import OutfitModel
 from app.ml.ml_agent import ml_agent
 
 logger = logging.getLogger(__name__)
+
+
+def _tipo_a_categoria(tipo: str) -> str:
+    """Mapea el tipo de prenda detectado por YOLO a la categoría CatVTON."""
+    t = tipo.lower()
+    if any(k in t for k in ["dress", "vestido"]):
+        return "dresses"
+    if any(k in t for k in ["pant", "jean", "short", "trouser", "falda", "skirt", "legging"]):
+        return "lower"
+    return "upper"
 
 
 async def recomendar_outfit(
@@ -256,4 +268,84 @@ async def obtener_outfits_diarios(
         "temporada": temporada,
         "total_outfits": len(outfits_del_dia),
         "outfits_del_dia": outfits_del_dia
+    }
+
+
+async def generar_outfits_ia(usuario: dict, temporada: str, db) -> dict:
+    """
+    Genera outfits del día con imagen IA del usuario usando CatVTON.
+
+    Proceso:
+    1. Verificar que el usuario tiene foto de perfil
+    2. Obtener outfits del día del recomendador KNN
+    3. Para cada outfit, llamar a CatVTON con la foto de perfil y la prenda base
+    4. Retornar lista de outfits con imagen generada
+
+    Returns:
+        dict con lista de outfits con imagen generada en base64
+    """
+    from app.services.virtual_tryon_service import VirtualTryOnService
+
+    # 1. Verificar foto de perfil
+    foto_perfil_url = usuario.get("foto_perfil_url")
+    if not foto_perfil_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Agrega tu foto de perfil para ver outfits con IA"
+        )
+
+    # 2. Cargar bytes de la foto de perfil desde disco
+    foto_path = Path(".") / foto_perfil_url.lstrip("/")
+    if not foto_path.exists():
+        raise HTTPException(
+            status_code=400,
+            detail="Agrega tu foto de perfil para ver outfits con IA"
+        )
+
+    persona_bytes = foto_path.read_bytes()
+    usuario_id = str(usuario["_id"])
+
+    # 3. Obtener outfits del día del recomendador
+    diarios = await obtener_outfits_diarios(temporada, usuario_id, db)
+    outfits = diarios.get("outfits_del_dia", [])
+
+    if not outfits:
+        return {"success": True, "total": 0, "outfits_ia": []}
+
+    # 4. Llamar CatVTON para cada outfit
+    service = VirtualTryOnService(db)
+    resultados = []
+
+    for outfit in outfits:
+        prenda_base = outfit["prenda_base"]
+        tipo = prenda_base.get("tipo", "")
+        categoria = _tipo_a_categoria(tipo)
+        imagen_url = prenda_base.get("imagen_url", "")
+
+        prenda_path = Path(".") / imagen_url.lstrip("/")
+        if not prenda_path.exists():
+            logger.warning(f"Imagen de prenda no encontrada: {prenda_path}")
+            continue
+
+        try:
+            prenda_bytes = prenda_path.read_bytes()
+            resultado = await service.generar_tryon_desde_bytes(
+                persona_bytes, prenda_bytes, categoria
+            )
+            resultados.append({
+                "outfit_id": outfit["outfit_id"],
+                "imagen_generada": resultado["imagen_resultado"],
+                "prenda_base": prenda_base,
+                "complementos": outfit["complementos"],
+                "tiempo_generacion": resultado.get("tiempo_total_backend", 0)
+            })
+        except Exception as e:
+            logger.error(f"CatVTON falló para outfit {outfit.get('outfit_id')}: {e}")
+
+    logger.info(f"✅ Outfits IA generados: {len(resultados)} para usuario {usuario_id}")
+
+    return {
+        "success": True,
+        "total": len(resultados),
+        "outfits_ia": resultados
     }

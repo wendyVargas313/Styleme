@@ -10,13 +10,15 @@ class ApiConfig {
   static const String apiPrefix = '$baseUrl/api/$apiVersion';
 
   // Timeouts
-  static const int connectTimeout = 30000; // 30 segundos
-  static const int receiveTimeout = 60000; // 60 segundos (ML puede tardar)
+  static const int connectTimeout = 30000;  // 30 segundos
+  static const int receiveTimeout = 60000;  // 60 segundos (ML puede tardar)
+  static const int tryonTimeout   = 180000; // 3 minutos (CatVTON inference)
 
   // Endpoints de Auth
-  static const String registro = '$apiPrefix/auth/registro';
-  static const String login = '$apiPrefix/auth/login';
-  static const String perfil = '$apiPrefix/auth/perfil';
+  static const String registro      = '$apiPrefix/auth/registro';
+  static const String login         = '$apiPrefix/auth/login';
+  static const String perfil        = '$apiPrefix/auth/perfil';
+  static const String fotoPerfil    = '$apiPrefix/auth/foto-perfil';
 
   // Endpoints de Guardarropa
   static const String agregarPrenda = '$apiPrefix/guardarropa/agregar';
@@ -26,7 +28,8 @@ class ApiConfig {
 
   // Endpoints de Recomendaciones
   static const String recomendarOutfit = '$apiPrefix/recomendar/outfit';
-  static const String outfitDiario = '$apiPrefix/recomendar/diario';
+  static const String outfitDiario    = '$apiPrefix/recomendar/diario';
+  static const String outfitsIA       = '$apiPrefix/recomendar/outfits-ia';
 
   // Endpoints de Historial
   static const String historial = '$apiPrefix/historial';
@@ -35,6 +38,10 @@ class ApiConfig {
 
   // Endpoints de Invitado
   static const String invitadoProbar = '$apiPrefix/invitado/probar';
+
+  // Endpoints de Virtual Try-On
+  static const String tryon = '$apiPrefix/tryon';
+  static const String tryonHealth = '$apiPrefix/tryon/health';
 
   // Health check
   static const String health = '$apiPrefix/health';
