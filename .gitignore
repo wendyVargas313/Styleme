@@ -30,3 +30,18 @@ env/
 # System files
 .DS_Store
 Thumbs.db
+
+# Modelos ML (archivos pesados, no versionar)
+*.pt
+*.pkl
+
+# Imágenes de prueba y resultados temporales
+test_persona*.png
+test_camiseta.jpg
+resultado_tryon_backend.jpg
+
+# IDEs
+.idea/
+
+# Uploads de usuarios (backend)
+styleme-backend/uploads/
