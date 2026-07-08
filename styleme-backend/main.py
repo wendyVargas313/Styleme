@@ -6,6 +6,7 @@ import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from bson.errors import InvalidId
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -15,6 +16,7 @@ from app.config.database import conectar_db, desconectar_db
 from app.config.settings import settings
 from app.ml.ml_agent import ml_agent
 from app.middleware.cors_middleware import configurar_cors
+from app.middleware.ratelimit_middleware import configurar_ratelimit
 from app.views.auth_router import router as auth_router
 from app.views.guardarropa_router import router as guardarropa_router
 from app.views.recomendacion_router import router as recomendacion_router
@@ -91,6 +93,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=422, content={"detail": errores})
 
 
+# Handler para IDs de MongoDB mal formados (ej. path param que no es un ObjectId válido)
+@app.exception_handler(InvalidId)
+async def invalid_id_handler(request: Request, exc: InvalidId):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "El ID proporcionado no tiene un formato válido."},
+    )
+
+
 # Handler global para capturar TODOS los errores 500 con traceback
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -103,6 +114,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Configurar CORS
 configurar_cors(app)
+
+# Configurar rate limiting (limiter global + handler para 429; se aplica por endpoint)
+configurar_ratelimit(app)
 
 # Servir archivos de imágenes estáticamente
 uploads_path = Path(settings.UPLOADS_PATH)

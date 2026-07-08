@@ -25,7 +25,8 @@ class UserModel:
             "genero": genero,
             "activo": True,
             "total_outfits_generados": 0,
-            "foto_perfil_url": None,
+            "foto_perfil_url": None,  # Foto de Try-On (cuerpo completo)
+            "foto_avatar_url": None,  # Avatar de identidad (para círculo en UI)
             "creado_en": datetime.utcnow(),
             "ultimo_acceso": datetime.utcnow()
         }
@@ -43,6 +44,7 @@ class UserModel:
             "activo": doc.get("activo", True),
             "total_outfits_generados": doc.get("total_outfits_generados", 0),
             "foto_perfil_url": doc.get("foto_perfil_url", None),
+            "foto_avatar_url": doc.get("foto_avatar_url", None),
             "creado_en": doc.get("creado_en", datetime.utcnow()).isoformat(),
             "ultimo_acceso": doc.get("ultimo_acceso", datetime.utcnow()).isoformat()
         }

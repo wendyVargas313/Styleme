@@ -134,7 +134,7 @@ async def login_usuario(datos: LoginRequest, db) -> dict:
 async def obtener_perfil(usuario: dict, db) -> dict:
     """
     Obtiene el perfil completo del usuario con estadísticas.
-    
+
     Returns:
         dict con datos del usuario y estadísticas
     """
@@ -154,6 +154,7 @@ async def obtener_perfil(usuario: dict, db) -> dict:
         "total_prendas": total_prendas,
         "total_outfits_generados": usuario.get("total_outfits_generados", 0),
         "foto_perfil_url": usuario.get("foto_perfil_url", None),
+        "foto_avatar_url": usuario.get("foto_avatar_url", None),
         "creado_en": usuario.get("creado_en", datetime.utcnow()).isoformat()
     }
 
@@ -210,3 +211,57 @@ async def obtener_foto_perfil(usuario: dict) -> dict:
     Retorna la URL de la foto de perfil del usuario (o null si no tiene).
     """
     return {"foto_perfil_url": usuario.get("foto_perfil_url", None)}
+
+
+async def subir_avatar(usuario: dict, imagen_bytes: bytes, db) -> dict:
+    """
+    Guarda el avatar del usuario en disco y actualiza MongoDB.
+
+    Proceso:
+    1. Convertir imagen a JPEG 512x512
+    2. Guardar en /uploads/{usuario_id}/avatar.jpg (sobreescribe)
+    3. Actualizar foto_avatar_url en MongoDB
+
+    Returns:
+        dict con ok y foto_avatar_url
+    """
+    usuario_id = str(usuario["_id"])
+
+    # Convertir imagen a JPEG cuadrado 512x512
+    try:
+        img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+        # Recorte centrado para mantener proporción
+        lado = min(img.width, img.height)
+        left = (img.width - lado) // 2
+        top = (img.height - lado) // 2
+        img = img.crop((left, top, left + lado, top + lado))
+        img = img.resize((512, 512), Image.LANCZOS)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Imagen no válida: {e}")
+
+    # Guardar en /uploads/{usuario_id}/avatar.jpg
+    directorio = Path(settings.UPLOADS_PATH) / usuario_id
+    directorio.mkdir(parents=True, exist_ok=True)
+    ruta = directorio / "avatar.jpg"
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92)
+    ruta.write_bytes(buf.getvalue())
+
+    foto_avatar_url = f"/uploads/{usuario_id}/avatar.jpg"
+
+    # Actualizar MongoDB
+    await db.usuarios.update_one(
+        {"_id": usuario["_id"]},
+        {"$set": {"foto_avatar_url": foto_avatar_url}}
+    )
+
+    logger.info(f"Avatar actualizado: {usuario_id}")
+    return {"ok": True, "foto_avatar_url": foto_avatar_url}
+
+
+async def obtener_avatar(usuario: dict) -> dict:
+    """
+    Retorna la URL del avatar del usuario (o null si no tiene).
+    """
+    return {"foto_avatar_url": usuario.get("foto_avatar_url", None)}

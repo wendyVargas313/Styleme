@@ -19,6 +19,7 @@ class ApiConfig {
   static const String login         = '$apiPrefix/auth/login';
   static const String perfil        = '$apiPrefix/auth/perfil';
   static const String fotoPerfil    = '$apiPrefix/auth/foto-perfil';
+  static const String fotoAvatar    = '$apiPrefix/auth/foto-avatar';
 
   // Endpoints de Guardarropa
   static const String agregarPrenda = '$apiPrefix/guardarropa/agregar';
