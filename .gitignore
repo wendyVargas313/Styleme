@@ -65,3 +65,6 @@ graphify-out/
 
 # Config local de Claude Code
 .claude/
+
+# Volcados de MongoDB (no versionar: contienen datos de usuarios)
+migracion/
