@@ -1,5 +1,10 @@
 # Guía de instalación de StyleMe desde cero
 
+> ℹ️ **Guía de instalación manual (alternativa).**
+> Para la vía recomendada —que no requiere instalar Python, MongoDB ni las
+> dependencias de Machine Learning— consulta **`GUIA_INSTALACION_DOCKER.md`**.
+> Esta guía se conserva para instalaciones sin Docker o como referencia.
+
 > **Para quién es esta guía:** para montar y correr el proyecto StyleMe en una máquina nueva (Windows) desde el repositorio clonado, dejando el backend funcionando y el módulo de Virtual Try-On operativo.
 >
 > **Cómo usar esta guía con una IA:** si te apoyas en una IA (Claude, Gemini, ChatGPT, etc.), puedes pegarle este documento completo al inicio de la conversación y decirle algo como: *"Esta es la guía de instalación de mi proyecto. Voy a seguir estos pasos en mi PC con Windows y te iré pegando las salidas y errores; ayúdame a interpretarlos y resolverlos sin romper lo que ya funciona, un paso a la vez."* Así la IA tiene todo el contexto y no te hace adivinar.

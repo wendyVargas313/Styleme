@@ -30,7 +30,6 @@ Es la forma más rápida de levantar el backend. No requiere instalar Python, ni
 ### Prerrequisitos
 
 - **Docker Desktop** (con backend WSL2 activado en Windows)
-- **MongoDB** corriendo en `localhost:27017`
 - **Git**
 
 ### Pasos
@@ -84,37 +83,18 @@ docker compose build          # Reconstruir tras cambiar código del backend
 
 > ⚠️ **El código del backend está horneado dentro de la imagen.** Si modificas archivos `.py`, el contenedor no los ve hasta que ejecutes `docker compose build` de nuevo.
 
-### ⚠️ MongoDB debe aceptar conexiones desde el contenedor
+### 🗄️ Base de datos
 
-Este es el problema más común al levantar el proyecto por primera vez.
+MongoDB corre dentro del propio `docker-compose` (servicio `mongo`), con un volumen
+persistente. **No hay que instalar MongoDB en el equipo.**
 
-MongoDB por defecto escucha **solo en `127.0.0.1`** (loopback). Compass funciona, pero el contenedor **no puede conectarse** y el health devuelve `"database": "disconnected"`.
+La base queda publicada en `localhost:27018` por si quieres inspeccionarla con
+MongoDB Compass (se usa el 27018 y no el 27017 para no chocar con una instalación
+local, si existe).
 
-**Solución** — editar `mongod.cfg` (normalmente en `C:\Program Files\MongoDB\Server\<version>\bin\mongod.cfg`) desde **PowerShell como Administrador**:
-
-```powershell
-# Backup primero
-Copy-Item "C:\Program Files\MongoDB\Server\8.2\bin\mongod.cfg" "C:\Program Files\MongoDB\Server\8.2\bin\mongod.cfg.bak" -Force
-
-# Cambiar bindIp (el ^\s* mantiene la indentación YAML correcta)
-(Get-Content "C:\Program Files\MongoDB\Server\8.2\bin\mongod.cfg") -replace '^\s*bindIp:.*', '  bindIp: 0.0.0.0' | Set-Content "C:\Program Files\MongoDB\Server\8.2\bin\mongod.cfg"
-
-# Reiniciar y verificar
-Restart-Service MongoDB
-netstat -ano | findstr :27017
-```
-
-Resultado correcto: `0.0.0.0:27017 LISTENING`.
-
-> 🔴 **Cuidado con la indentación.** MongoDB es estricto con el YAML: `port` y `bindIp` deben ir con **exactamente 2 espacios**. Si queda mal, el servicio no arranca.
->
-> ```yaml
-> net:
->   port: 27017
->   bindIp: 0.0.0.0
-> ```
->
-> 📌 Una actualización de MongoDB puede revertir el `bindIp` a `127.0.0.1`. Si el backend deja de conectar de repente, revisar esto primero.
+> 🔴 Nunca uses `docker compose down -v`: la bandera `-v` borra el volumen
+> `mongo-data` con todos los usuarios, prendas y outfits. Para apagar, usa
+> `docker compose stop`.
 
 ---
 
@@ -123,7 +103,7 @@ Resultado correcto: `0.0.0.0:27017 LISTENING`.
 ### Prerrequisitos
 
 - Python 3.11
-- MongoDB en `localhost:27017`
+- **MongoDB instalada localmente y corriendo en `localhost:27017`** (a diferencia de la vía Docker, aquí sí es necesaria)
 
 ```bash
 cd styleme-backend
@@ -353,8 +333,7 @@ curl http://localhost:8000/api/v1/health
 | Síntoma | Causa probable | Solución |
 |---------|----------------|----------|
 | App: *"No se puede conectar al servidor"* | `adb reverse` perdido al desconectar el cable | `adb reverse tcp:8000 tcp:8000` |
-| `"database": "disconnected"` | `bindIp: 127.0.0.1` en `mongod.cfg` | Ver sección de MongoDB |
-| MongoDB no arranca tras editar config | Indentación YAML incorrecta | `port` y `bindIp` con 2 espacios |
+| `"database": "disconnected"` | El contenedor de MongoDB no arrancó | `docker compose ps` y revisar `docker compose logs mongo` |
 | Try-On falla al instante | Firewall bloqueando ngrok | Usar datos móviles |
 | Error al registrar usuario (DuplicateKey) | Índice antiguo `correo_1` en MongoDB | Eliminar el índice obsoleto |
 | Device `unauthorized` en adb | Falta autorizar depuración USB | Aceptar el diálogo en el teléfono |
