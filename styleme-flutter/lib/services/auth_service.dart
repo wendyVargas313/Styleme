@@ -72,4 +72,17 @@ class AuthService {
     final data = response.data as Map<String, dynamic>;
     return data['foto_perfil_url'] as String;
   }
+
+  // Sube el avatar como multipart y retorna la URL guardada
+  Future<String> subirAvatar(File foto) async {
+    final formData = FormData.fromMap({
+      'foto': await MultipartFile.fromFile(
+        foto.path,
+        filename: 'avatar.jpg',
+      ),
+    });
+    final response = await _api.postFormData(ApiConfig.fotoAvatar, formData);
+    final data = response.data as Map<String, dynamic>;
+    return data['foto_avatar_url'] as String;
+  }
 }

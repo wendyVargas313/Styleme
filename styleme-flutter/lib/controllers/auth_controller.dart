@@ -1,6 +1,6 @@
 // StyleMe - Controller de Autenticación (Provider)
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:styleme/config/api_config.dart';
 import 'package:styleme/models/user_model.dart';
 import 'package:styleme/services/auth_service.dart';
@@ -15,6 +15,7 @@ class AuthController extends ChangeNotifier {
   AuthEstado _estado = AuthEstado.inicial;
   UserModel? _usuario;
   String? _mensajeError;
+  int? _fotoVersion;
 
   AuthEstado get estado => _estado;
   UserModel? get usuario => _usuario;
@@ -105,8 +106,12 @@ class AuthController extends ChangeNotifier {
   Future<bool> subirFotoPerfil(File foto) async {
     try {
       final url = await _authService.subirFotoPerfil(foto);
+      // Evict de la imagen vieja del caché (la URL es fija, hay que forzar recarga)
+      final urlCompleta = '${ApiConfig.baseUrl}$url';
+      await NetworkImage(urlCompleta).evict();
       _usuario = _usuario?.copyWith(fotoPerfilUrl: url);
       await _storage.guardarUsuario(_usuario!);
+      _fotoVersion = DateTime.now().millisecondsSinceEpoch;
       notifyListeners();
       return true;
     } catch (e) {
@@ -117,8 +122,37 @@ class AuthController extends ChangeNotifier {
   }
 
   // Obtiene la URL completa de la foto de perfil del usuario actual
-  String? get fotoPerfilUrlCompleta =>
-      _usuario?.fotoPerfilUrlCompleta(ApiConfig.baseUrl);
+  String? get fotoPerfilUrlCompleta {
+    final base = _usuario?.fotoPerfilUrlCompleta(ApiConfig.baseUrl);
+    if (base == null) return null;
+    return _fotoVersion != null ? '$base?t=$_fotoVersion' : base;
+  }
+
+  // Sube el avatar y actualiza el usuario en memoria
+  Future<bool> subirAvatar(File foto) async {
+    try {
+      final url = await _authService.subirAvatar(foto);
+      // Evict de la imagen vieja del caché (la URL es fija, hay que forzar recarga)
+      final urlCompleta = '${ApiConfig.baseUrl}$url';
+      await NetworkImage(urlCompleta).evict();
+      _usuario = _usuario?.copyWith(fotoAvatarUrl: url);
+      await _storage.guardarUsuario(_usuario!);
+      _fotoVersion = DateTime.now().millisecondsSinceEpoch;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _mensajeError = 'Error subiendo avatar: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Obtiene la URL completa del avatar del usuario actual
+  String? get fotoAvatarUrlCompleta {
+    final base = _usuario?.fotoAvatarUrlCompleta(ApiConfig.baseUrl);
+    if (base == null) return null;
+    return _fotoVersion != null ? '$base?t=$_fotoVersion' : base;
+  }
 
   // Cerrar sesión
   Future<void> cerrarSesion() async {

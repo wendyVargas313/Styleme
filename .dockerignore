@@ -1,0 +1,15 @@
+styleme-flutter/
+graphify-out/
+.graphify/
+.claude/
+.git/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/.env
+**/uploads/
+**/*.log
+**/*.bak_*
+diag_*.py
+reguardar_*.py
+verif_*.sh

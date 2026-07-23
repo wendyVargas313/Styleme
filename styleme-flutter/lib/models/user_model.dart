@@ -8,6 +8,7 @@ class UserModel {
   final int totalOutfitsGenerados;
   final String creadoEn;
   final String? fotoPerfilUrl;
+  final String? fotoAvatarUrl;
 
   UserModel({
     required this.id,
@@ -18,6 +19,7 @@ class UserModel {
     this.totalOutfitsGenerados = 0,
     required this.creadoEn,
     this.fotoPerfilUrl,
+    this.fotoAvatarUrl,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class UserModel {
       totalOutfitsGenerados: json['total_outfits_generados'] ?? 0,
       creadoEn: json['creado_en'] ?? '',
       fotoPerfilUrl: json['foto_perfil_url'] as String?,
+      fotoAvatarUrl: json['foto_avatar_url'] as String?,
     );
   }
 
@@ -50,8 +53,12 @@ class UserModel {
   String? fotoPerfilUrlCompleta(String baseUrl) =>
       fotoPerfilUrl != null ? '$baseUrl$fotoPerfilUrl' : null;
 
-  // Retorna una copia con foto_perfil_url actualizada
-  UserModel copyWith({String? fotoPerfilUrl}) => UserModel(
+  // URL completa del avatar (con baseUrl)
+  String? fotoAvatarUrlCompleta(String baseUrl) =>
+      fotoAvatarUrl != null ? '$baseUrl$fotoAvatarUrl' : null;
+
+  // Retorna una copia con foto_perfil_url y/o foto_avatar_url actualizada
+  UserModel copyWith({String? fotoPerfilUrl, String? fotoAvatarUrl}) => UserModel(
         id: id,
         nombre: nombre,
         email: email,
@@ -60,5 +67,6 @@ class UserModel {
         totalOutfitsGenerados: totalOutfitsGenerados,
         creadoEn: creadoEn,
         fotoPerfilUrl: fotoPerfilUrl ?? this.fotoPerfilUrl,
+        fotoAvatarUrl: fotoAvatarUrl ?? this.fotoAvatarUrl,
       );
 }

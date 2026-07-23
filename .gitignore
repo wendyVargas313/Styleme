@@ -30,3 +30,41 @@ env/
 # System files
 .DS_Store
 Thumbs.db
+
+# Modelos ML (archivos pesados, no versionar)
+*.pt
+*.pkl
+!modelo_color.pkl
+!modelo_recomendador_outfits.pkl
+!styleme_detector.pt
+
+# Imágenes de prueba y resultados temporales
+test_persona*.png
+test_camiseta.jpg
+resultado_tryon_backend.jpg
+
+# IDEs
+.idea/
+
+# Uploads de usuarios (backend)
+styleme-backend/uploads/
+
+# Archivos temporales de diagnóstico/verificación (sesiones de debugging)
+diag_*.py
+reguardar_*.py
+verif_*.sh
+*.bak_*
+test_avatar.png
+test_rembg_resultado.png
+backend_*.log
+styleme-flutter/devtools_options.yaml
+
+# Salida generada de Graphify (no versionar)
+graphify-out/
+.graphify/
+
+# Config local de Claude Code
+.claude/
+
+# Volcados de MongoDB (no versionar: contienen datos de usuarios)
+migracion/

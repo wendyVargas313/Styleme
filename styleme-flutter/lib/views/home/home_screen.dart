@@ -124,7 +124,7 @@ class _HomeTab extends StatelessWidget {
                           ),
                         ],
                       ),
-                      // Avatar glass
+                      // Avatar glass (foto si existe, inicial como fallback)
                       Container(
                         width: 46,
                         height: 46,
@@ -133,15 +133,34 @@ class _HomeTab extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: StyleMeTheme.naranjaGlow,
                         ),
-                        child: Center(
-                          child: Text(
-                            authCtrl.usuario?.inicial ?? 'S',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
+                        child: ClipOval(
+                          child: authCtrl.fotoAvatarUrlCompleta != null
+                              ? Image.network(
+                                  authCtrl.fotoAvatarUrlCompleta!,
+                                  fit: BoxFit.cover,
+                                  width: 46,
+                                  height: 46,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      authCtrl.usuario?.inicial ?? 'S',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    authCtrl.usuario?.inicial ?? 'S',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                     ],
@@ -580,7 +599,7 @@ class _HomeTab extends StatelessWidget {
               child: _accesoRapido(
                 context,
                 icono: Icons.add_photo_alternate,
-                titulo: 'Agregar\nprenda',
+                titulo: 'Agregar prenda',
                 onTap: () => Navigator.pushNamed(context, '/agregar-prenda'),
               ),
             ),
@@ -589,7 +608,7 @@ class _HomeTab extends StatelessWidget {
               child: _accesoRapido(
                 context,
                 icono: Icons.auto_awesome,
-                titulo: 'Crear\noutfit',
+                titulo: 'Crear outfit',
                 onTap: () => Navigator.pushNamed(context, '/recomendacion'),
               ),
             ),
@@ -598,7 +617,7 @@ class _HomeTab extends StatelessWidget {
               child: _accesoRapido(
                 context,
                 icono: Icons.dry_cleaning,
-                titulo: 'Virtual\nTry-On',
+                titulo: 'Virtual Try-On',
                 onTap: () => Navigator.pushNamed(context, '/tryon'),
               ),
             ),
@@ -617,13 +636,15 @@ class _HomeTab extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
           color: StyleMeTheme.card,
           borderRadius: BorderRadius.circular(16),
           boxShadow: StyleMeTheme.sombraCard,
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(10),
@@ -633,18 +654,19 @@ class _HomeTab extends StatelessWidget {
               ),
               child: Icon(icono, color: Colors.white, size: 22),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                titulo,
-                style: GoogleFonts.poppins(
-                  color: StyleMeTheme.textPrimary,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
+            const SizedBox(height: 10),
+            Text(
+              titulo,
+              textAlign: TextAlign.center,
+              softWrap: true,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                color: StyleMeTheme.textPrimary,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
               ),
             ),
-            const Icon(Icons.chevron_right, color: StyleMeTheme.textSecondary, size: 18),
           ],
         ),
       ),

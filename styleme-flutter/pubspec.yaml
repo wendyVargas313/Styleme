@@ -19,6 +19,9 @@ dependencies:
   # Imagen y cámara
   image_picker: ^1.1.2
 
+  # Corrección de orientación EXIF
+  image: ^4.8.0
+
   # Almacenamiento local
   shared_preferences: ^2.2.3
 

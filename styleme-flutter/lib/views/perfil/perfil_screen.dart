@@ -20,6 +20,7 @@ class PerfilScreen extends StatefulWidget {
 
 class _PerfilScreenState extends State<PerfilScreen> {
   bool _subiendoFoto = false;
+  bool _subiendoAvatar = false;
   static const _naranja = Color(0xFFFF6B00);
 
   @override
@@ -82,6 +83,58 @@ class _PerfilScreenState extends State<PerfilScreen> {
     ));
   }
 
+  Future<void> _seleccionarAvatar() async {
+    final picker = ImagePicker();
+    final opcion = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: StyleMeTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Seleccionar avatar',
+                style: GoogleFonts.poppins(
+                    color: StyleMeTheme.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: _naranja),
+              title: Text('Cámara',
+                  style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: _naranja),
+              title: Text('Galería',
+                  style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (opcion == null || !mounted) return;
+
+    final picked = await picker.pickImage(source: opcion, imageQuality: 90);
+    if (picked == null || !mounted) return;
+
+    setState(() => _subiendoAvatar = true);
+    final ok = await context.read<AuthController>().subirAvatar(File(picked.path));
+    if (!mounted) return;
+    setState(() => _subiendoAvatar = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Avatar actualizado' : 'Error al subir el avatar'),
+      backgroundColor: ok ? _naranja : StyleMeTheme.error,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final authCtrl = context.watch<AuthController>();
@@ -112,20 +165,77 @@ class _PerfilScreenState extends State<PerfilScreen> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // Avatar con inicial
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: const BoxDecoration(
-                      gradient: StyleMeTheme.gradientePrimario,
-                      shape: BoxShape.circle,
-                      boxShadow: StyleMeTheme.naranjaGlow,
-                    ),
-                    child: Center(
-                      child: Text(
-                        usuario?.inicial ?? 'S',
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold),
-                      ),
+                  // Avatar con foto (o inicial como fallback) + badge de cámara
+                  GestureDetector(
+                    onTap: _subiendoAvatar ? null : _seleccionarAvatar,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: const BoxDecoration(
+                            gradient: StyleMeTheme.gradientePrimario,
+                            shape: BoxShape.circle,
+                            boxShadow: StyleMeTheme.naranjaGlow,
+                          ),
+                          child: ClipOval(
+                            child: authCtrl.fotoAvatarUrlCompleta != null
+                                ? Image.network(
+                                    authCtrl.fotoAvatarUrlCompleta!,
+                                    fit: BoxFit.cover,
+                                    width: 80,
+                                    height: 80,
+                                    errorBuilder: (_, __, ___) => Center(
+                                      child: Text(
+                                        usuario?.inicial ?? 'S',
+                                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      usuario?.inicial ?? 'S',
+                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        // Indicador de carga sobre el avatar
+                        if (_subiendoAvatar)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        // Badge de cámara
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: _naranja,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: StyleMeTheme.surface, width: 2),
+                            ),
+                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 13),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),

@@ -1,0 +1,32 @@
+services:
+  mongo:
+    image: mongo:8.0
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27018:27017"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: styleme-backend/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - styleme-backend/.env
+    environment:
+      MONGODB_URL: mongodb://mongo:27017
+      ML_MODELS_PATH: /app/models
+      UPLOADS_PATH: /app/uploads
+      YOLO_CONFIG_DIR: /tmp/Ultralytics
+    volumes:
+      - ./styleme-backend/uploads:/app/uploads
+      - u2net-cache:/root/.u2net
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+volumes:
+  u2net-cache:
+  mongo-data:

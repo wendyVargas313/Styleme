@@ -4,7 +4,7 @@ class ApiConfig {
   // Cambiar a la IP del servidor en producción
   // static const String baseUrl = 'http://10.0.2.2:8000'; // Android emulador
   // static const String baseUrl = 'http://localhost:8000'; // Web / iOS simulator
-  static const String baseUrl = 'http://192.168.0.8:8000'; // Dispositivo físico
+  static const String baseUrl = 'http://localhost:8000'; // adb reverse
 
   static const String apiVersion = 'v1';
   static const String apiPrefix = '$baseUrl/api/$apiVersion';
@@ -19,6 +19,7 @@ class ApiConfig {
   static const String login         = '$apiPrefix/auth/login';
   static const String perfil        = '$apiPrefix/auth/perfil';
   static const String fotoPerfil    = '$apiPrefix/auth/foto-perfil';
+  static const String fotoAvatar    = '$apiPrefix/auth/foto-avatar';
 
   // Endpoints de Guardarropa
   static const String agregarPrenda = '$apiPrefix/guardarropa/agregar';
