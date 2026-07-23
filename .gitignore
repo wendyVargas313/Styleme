@@ -34,6 +34,9 @@ Thumbs.db
 # Modelos ML (archivos pesados, no versionar)
 *.pt
 *.pkl
+!modelo_color.pkl
+!modelo_recomendador_outfits.pkl
+!styleme_detector.pt
 
 # Imágenes de prueba y resultados temporales
 test_persona*.png
@@ -55,3 +58,10 @@ test_avatar.png
 test_rembg_resultado.png
 backend_*.log
 styleme-flutter/devtools_options.yaml
+
+# Salida generada de Graphify (no versionar)
+graphify-out/
+.graphify/
+
+# Config local de Claude Code
+.claude/
