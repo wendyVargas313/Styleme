@@ -16,7 +16,22 @@ Este archivo proporciona orientación a Claude Code (claude.ai/code) al trabajar
 
 ## Comandos Esenciales
 
-### Configuración e Instalación del Backend
+### Levantar el proyecto (Docker — vía recomendada)
+
+El backend y MongoDB corren en Docker. No requiere instalar Python ni MongoDB.
+
+```bash
+docker compose build      # primera vez
+docker compose up -d      # levanta backend + mongo
+docker compose stop       # apagar (NUNCA "down -v": borra la base de datos)
+```
+
+API en `http://localhost:8000` · Health: `GET /api/v1/health` · Docs: `/docs`
+MongoDB del contenedor expuesta en `localhost:27018`.
+
+Los comandos manuales de abajo son la **alternativa sin Docker**.
+
+### Configuración e Instalación del Backend (alternativa sin Docker)
 
 ```bash
 # Instalar dependencias (Python 3.11+)
@@ -34,7 +49,7 @@ curl http://localhost:8000/api/v1/health
 # Navegador: http://localhost:8000/docs
 ```
 
-**Requisitos:** MongoDB ejecutándose en `localhost:27017` (o configurado en `.env`)
+**Requisitos (solo si no usas Docker):** MongoDB ejecutándose en `localhost:27017` (o configurado en `.env`)
 
 ### Configuración e Instalación del Frontend
 
@@ -97,6 +112,8 @@ Tres modelos trabajan en secuencia (`ml/ml_agent.py` → `ml_agent.procesar_imag
 
 Todos los archivos de modelos están en la **raíz del proyecto** (un nivel arriba de `styleme-backend/`), configurado mediante `ML_MODELS_PATH` en settings.
 
+Además, `rembg` + `onnxruntime` (modelo u2net) se usan para eliminación de fondo en Virtual Try-On; en Docker el modelo u2net se cachea en el volumen `u2net-cache`.
+
 ### Frontend (Flutter)
 
 **Gestión de estado basada en Provider:**
@@ -133,12 +150,14 @@ Todos los endpoints bajo `/api/v1/`:
 
 | Router | Propósito | Endpoints Clave |
 |--------|----------|-----------------|
-| `auth_router` | JWT + registro | `POST /auth/registro`, `/login`, `GET /auth/perfil` |
+| `auth_router` | JWT + registro | `POST /auth/registro`, `/login`, `GET /auth/perfil`, `GET/POST /auth/foto-perfil`, `GET/POST /auth/foto-avatar` |
 | `guardarropa_router` | CRUD de guardarropa + procesamiento de ML | `POST /guardarropa/agregar` (con YOLO+KMeans), `GET /listar`, `/stats`, `DELETE /{id}` |
-| `recomendacion_router` | Generación de outfits | `POST /recomendar/outfit`, `GET /recomendar/diario` |
+| `recomendacion_router` | Generación de outfits | `POST /recomendar/outfit`, `GET /recomendar/diario`, `POST /recomendar/outfits-ia` |
 | `historial_router` | Historial + retroalimentación | `GET /historial`, `POST /historial/feedback` |
 | `invitado_router` | Modo invitado | `POST /invitado/probar` |
-| `tryon_router` | Prueba virtual | `POST /tryon/` |
+| `tryon_router` | Prueba virtual (con CatVTON) | `POST /tryon`, `GET /tryon/health` |
+
+Endpoint de sistema (definido directamente en `main.py`, fuera de cualquier router): `GET /api/v1/health` — verifica estado del `ml_agent` y conexión a MongoDB.
 
 **Autenticación:** Agregar encabezado `Authorization: Bearer <token>`. Los tokens vencen en 7 días. Renovar mediante re-login.
 
@@ -173,6 +192,8 @@ Todos los endpoints bajo `/api/v1/`:
 ---
 
 ## Configuración del Entorno
+
+> En Docker, el compose sobrescribe `MONGODB_URL` (`mongodb://mongo:27017`), `ML_MODELS_PATH` (`/app/models`) y `UPLOADS_PATH` (`/app/uploads`). Los valores del `.env` de abajo solo aplican en instalación manual (sin Docker).
 
 Crear `.env` en `styleme-backend/` (o usar `.env.example`):
 
