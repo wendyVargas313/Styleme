@@ -44,6 +44,15 @@ class ApiConfig {
   static const String tryon = '$apiPrefix/tryon';
   static const String tryonHealth = '$apiPrefix/tryon/health';
 
+  // Endpoints de Agente
+  static const String agenteRecomendarEvento = '$apiPrefix/agente/recomendar-evento';
+  static const String agenteRecomendaciones = '$apiPrefix/agente/recomendaciones';
+  static String agenteRecomendacionDetalle(String id) => '$apiPrefix/agente/recomendaciones/$id';
+  static String agenteGuardarOutfit(String recomendacionId, int indice) =>
+      '$apiPrefix/agente/recomendaciones/$recomendacionId/outfits/$indice/guardar';
+  static String agenteEliminarOutfit(String recomendacionId, int indice) =>
+      '$apiPrefix/agente/recomendaciones/$recomendacionId/outfits/$indice';
+
   // Health check
   static const String health = '$apiPrefix/health';
 }

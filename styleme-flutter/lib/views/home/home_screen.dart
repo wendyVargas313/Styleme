@@ -621,6 +621,16 @@ class _HomeTab extends StatelessWidget {
                 onTap: () => Navigator.pushNamed(context, '/tryon'),
               ),
             ),
+            const SizedBox(width: 12),
+            // Punto de entrada temporal - Fase 9
+            Expanded(
+              child: _accesoRapido(
+                context,
+                icono: Icons.event,
+                titulo: 'Evento',
+                onTap: () => Navigator.pushNamed(context, '/agente-evento'),
+              ),
+            ),
           ],
         ),
       ],
