@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:styleme/app/routes.dart';
 import 'package:styleme/config/theme.dart';
+import 'package:styleme/controllers/agente_evento_controller.dart';
 import 'package:styleme/controllers/auth_controller.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
 import 'package:styleme/controllers/historial_controller.dart';
@@ -19,6 +20,7 @@ class StyleMeApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GuardarropaController()),
         ChangeNotifierProvider(create: (_) => RecomendacionController()),
         ChangeNotifierProvider(create: (_) => HistorialController()),
+        ChangeNotifierProvider(create: (_) => AgenteEventoController()),
       ],
       child: MaterialApp(
         title: 'StyleMe',

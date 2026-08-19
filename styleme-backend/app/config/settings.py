@@ -29,6 +29,11 @@ class Settings:
     # Rate limiting
     MAX_REQUESTS_PER_MINUTE: int = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "10"))
 
+    # Agente IA
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "")
+    OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
+
     # API
     API_VERSION: str = os.getenv("API_VERSION", "v1")
     APP_NAME: str = "StyleMe API"

@@ -16,7 +16,23 @@ Este archivo proporciona orientación a Claude Code (claude.ai/code) al trabajar
 
 ## Comandos Esenciales
 
-### Configuración e Instalación del Backend
+<!-- AUTO:COMANDOS:START -->
+### Levantar el proyecto (Docker — vía recomendada)
+
+Servicios definidos en `docker-compose.yml`: `mongo` (imagen `mongo:8.0`, volumen `mongo-data`) y `backend` (build desde `styleme-backend/Dockerfile`, volumen `u2net-cache` para rembg). El backend y MongoDB corren en Docker. No requiere instalar Python ni MongoDB.
+
+```bash
+docker compose build      # primera vez
+docker compose up -d      # levanta backend + mongo
+docker compose stop       # apagar (NUNCA "down -v": borra la base de datos)
+```
+
+API en `http://localhost:8000` · Health: `GET /api/v1/health` · Docs: `/docs`
+MongoDB del contenedor expuesta en `localhost:27018` (mapeada al `27017` interno).
+
+Los comandos manuales de abajo son la **alternativa sin Docker**.
+
+### Configuración e Instalación del Backend (alternativa sin Docker)
 
 ```bash
 # Instalar dependencias (Python 3.11+)
@@ -34,7 +50,8 @@ curl http://localhost:8000/api/v1/health
 # Navegador: http://localhost:8000/docs
 ```
 
-**Requisitos:** MongoDB ejecutándose en `localhost:27017` (o configurado en `.env`)
+**Requisitos (solo si no usas Docker):** MongoDB ejecutándose en `localhost:27017` (o configurado en `.env`)
+<!-- AUTO:COMANDOS:END -->
 
 ### Configuración e Instalación del Frontend
 
@@ -97,6 +114,8 @@ Tres modelos trabajan en secuencia (`ml/ml_agent.py` → `ml_agent.procesar_imag
 
 Todos los archivos de modelos están en la **raíz del proyecto** (un nivel arriba de `styleme-backend/`), configurado mediante `ML_MODELS_PATH` en settings.
 
+Además, `rembg` + `onnxruntime` (modelo u2net) se usan para eliminación de fondo en Virtual Try-On; en Docker el modelo u2net se cachea en el volumen `u2net-cache`.
+
 ### Frontend (Flutter)
 
 **Gestión de estado basada en Provider:**
@@ -127,20 +146,40 @@ Todos los archivos de modelos están en la **raíz del proyecto** (un nivel arri
 
 ---
 
+<!-- AUTO:ENDPOINTS:START -->
 ## Estructura de API
 
-Todos los endpoints bajo `/api/v1/`:
+Todos los endpoints bajo `/api/v1/` salvo el indicado como raíz. Columna "Auth" (✅ requiere `Authorization: Bearer <token>` vía `Depends(get_usuario_actual)`, ❌ pública):
 
-| Router | Propósito | Endpoints Clave |
-|--------|----------|-----------------|
-| `auth_router` | JWT + registro | `POST /auth/registro`, `/login`, `GET /auth/perfil` |
-| `guardarropa_router` | CRUD de guardarropa + procesamiento de ML | `POST /guardarropa/agregar` (con YOLO+KMeans), `GET /listar`, `/stats`, `DELETE /{id}` |
-| `recomendacion_router` | Generación de outfits | `POST /recomendar/outfit`, `GET /recomendar/diario` |
-| `historial_router` | Historial + retroalimentación | `GET /historial`, `POST /historial/feedback` |
-| `invitado_router` | Modo invitado | `POST /invitado/probar` |
-| `tryon_router` | Prueba virtual | `POST /tryon/` |
+| Router | Endpoint | Auth |
+|---|---|---|
+| `auth_router` (`/auth`) | `POST /auth/registro` | ❌ |
+| | `POST /auth/login` | ❌ |
+| | `GET /auth/perfil` | ✅ |
+| | `POST /auth/foto-perfil` | ✅ |
+| | `GET /auth/foto-perfil` | ✅ |
+| | `POST /auth/foto-avatar` | ✅ |
+| | `GET /auth/foto-avatar` | ✅ |
+| `guardarropa_router` (`/guardarropa`) | `POST /guardarropa/agregar` (YOLO+KMeans) | ✅ |
+| | `GET /guardarropa/listar` | ✅ |
+| | `GET /guardarropa/stats` | ✅ |
+| | `DELETE /guardarropa/{prenda_id}` | ✅ |
+| `recomendacion_router` (`/recomendar`) | `POST /recomendar/outfit` | ✅ |
+| | `GET /recomendar/diario` | ✅ |
+| | `POST /recomendar/outfits-ia` | ✅ |
+| `historial_router` (`/historial`) | `GET /historial` | ✅ |
+| | `POST /historial/feedback` | ✅ |
+| | `DELETE /historial/{outfit_id}` | ✅ |
+| `invitado_router` (`/invitado`) | `POST /invitado/probar` | ❌ |
+| `tryon_router` (`/tryon`, CatVTON) | `POST /tryon` | ✅ |
+| | `GET /tryon/health` | ❌ |
+| Sistema (`main.py`, sin router) | `GET /api/v1/health` — estado del `ml_agent` y conexión a MongoDB | ❌ |
+| | `GET /` — info raíz de la API | ❌ |
+
+Nota: `virtual_tryon_controller.py` define su propio `APIRouter(prefix="/virtual-tryon")` con `POST /generar` y `GET /health`, pero ese router nunca se monta en `main.py` — solo se reutilizan sus funciones desde `tryon_router.py`. Esas rutas `/virtual-tryon/*` no son accesibles por HTTP.
 
 **Autenticación:** Agregar encabezado `Authorization: Bearer <token>`. Los tokens vencen en 7 días. Renovar mediante re-login.
+<!-- AUTO:ENDPOINTS:END -->
 
 ---
 
@@ -173,6 +212,8 @@ Todos los endpoints bajo `/api/v1/`:
 ---
 
 ## Configuración del Entorno
+
+> En Docker, el compose sobrescribe `MONGODB_URL` (`mongodb://mongo:27017`), `ML_MODELS_PATH` (`/app/models`) y `UPLOADS_PATH` (`/app/uploads`). Los valores del `.env` de abajo solo aplican en instalación manual (sin Docker).
 
 Crear `.env` en `styleme-backend/` (o usar `.env.example`):
 
