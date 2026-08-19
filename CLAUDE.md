@@ -16,9 +16,10 @@ Este archivo proporciona orientación a Claude Code (claude.ai/code) al trabajar
 
 ## Comandos Esenciales
 
+<!-- AUTO:COMANDOS:START -->
 ### Levantar el proyecto (Docker — vía recomendada)
 
-El backend y MongoDB corren en Docker. No requiere instalar Python ni MongoDB.
+Servicios definidos en `docker-compose.yml`: `mongo` (imagen `mongo:8.0`, volumen `mongo-data`) y `backend` (build desde `styleme-backend/Dockerfile`, volumen `u2net-cache` para rembg). El backend y MongoDB corren en Docker. No requiere instalar Python ni MongoDB.
 
 ```bash
 docker compose build      # primera vez
@@ -27,7 +28,7 @@ docker compose stop       # apagar (NUNCA "down -v": borra la base de datos)
 ```
 
 API en `http://localhost:8000` · Health: `GET /api/v1/health` · Docs: `/docs`
-MongoDB del contenedor expuesta en `localhost:27018`.
+MongoDB del contenedor expuesta en `localhost:27018` (mapeada al `27017` interno).
 
 Los comandos manuales de abajo son la **alternativa sin Docker**.
 
@@ -50,6 +51,7 @@ curl http://localhost:8000/api/v1/health
 ```
 
 **Requisitos (solo si no usas Docker):** MongoDB ejecutándose en `localhost:27017` (o configurado en `.env`)
+<!-- AUTO:COMANDOS:END -->
 
 ### Configuración e Instalación del Frontend
 
@@ -144,22 +146,40 @@ Además, `rembg` + `onnxruntime` (modelo u2net) se usan para eliminación de fon
 
 ---
 
+<!-- AUTO:ENDPOINTS:START -->
 ## Estructura de API
 
-Todos los endpoints bajo `/api/v1/`:
+Todos los endpoints bajo `/api/v1/` salvo el indicado como raíz. Columna "Auth" (✅ requiere `Authorization: Bearer <token>` vía `Depends(get_usuario_actual)`, ❌ pública):
 
-| Router | Propósito | Endpoints Clave |
-|--------|----------|-----------------|
-| `auth_router` | JWT + registro | `POST /auth/registro`, `/login`, `GET /auth/perfil`, `GET/POST /auth/foto-perfil`, `GET/POST /auth/foto-avatar` |
-| `guardarropa_router` | CRUD de guardarropa + procesamiento de ML | `POST /guardarropa/agregar` (con YOLO+KMeans), `GET /listar`, `/stats`, `DELETE /{id}` |
-| `recomendacion_router` | Generación de outfits | `POST /recomendar/outfit`, `GET /recomendar/diario`, `POST /recomendar/outfits-ia` |
-| `historial_router` | Historial + retroalimentación | `GET /historial`, `POST /historial/feedback` |
-| `invitado_router` | Modo invitado | `POST /invitado/probar` |
-| `tryon_router` | Prueba virtual (con CatVTON) | `POST /tryon`, `GET /tryon/health` |
+| Router | Endpoint | Auth |
+|---|---|---|
+| `auth_router` (`/auth`) | `POST /auth/registro` | ❌ |
+| | `POST /auth/login` | ❌ |
+| | `GET /auth/perfil` | ✅ |
+| | `POST /auth/foto-perfil` | ✅ |
+| | `GET /auth/foto-perfil` | ✅ |
+| | `POST /auth/foto-avatar` | ✅ |
+| | `GET /auth/foto-avatar` | ✅ |
+| `guardarropa_router` (`/guardarropa`) | `POST /guardarropa/agregar` (YOLO+KMeans) | ✅ |
+| | `GET /guardarropa/listar` | ✅ |
+| | `GET /guardarropa/stats` | ✅ |
+| | `DELETE /guardarropa/{prenda_id}` | ✅ |
+| `recomendacion_router` (`/recomendar`) | `POST /recomendar/outfit` | ✅ |
+| | `GET /recomendar/diario` | ✅ |
+| | `POST /recomendar/outfits-ia` | ✅ |
+| `historial_router` (`/historial`) | `GET /historial` | ✅ |
+| | `POST /historial/feedback` | ✅ |
+| | `DELETE /historial/{outfit_id}` | ✅ |
+| `invitado_router` (`/invitado`) | `POST /invitado/probar` | ❌ |
+| `tryon_router` (`/tryon`, CatVTON) | `POST /tryon` | ✅ |
+| | `GET /tryon/health` | ❌ |
+| Sistema (`main.py`, sin router) | `GET /api/v1/health` — estado del `ml_agent` y conexión a MongoDB | ❌ |
+| | `GET /` — info raíz de la API | ❌ |
 
-Endpoint de sistema (definido directamente en `main.py`, fuera de cualquier router): `GET /api/v1/health` — verifica estado del `ml_agent` y conexión a MongoDB.
+Nota: `virtual_tryon_controller.py` define su propio `APIRouter(prefix="/virtual-tryon")` con `POST /generar` y `GET /health`, pero ese router nunca se monta en `main.py` — solo se reutilizan sus funciones desde `tryon_router.py`. Esas rutas `/virtual-tryon/*` no son accesibles por HTTP.
 
 **Autenticación:** Agregar encabezado `Authorization: Bearer <token>`. Los tokens vencen en 7 días. Renovar mediante re-login.
+<!-- AUTO:ENDPOINTS:END -->
 
 ---
 
