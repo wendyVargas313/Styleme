@@ -1,0 +1,142 @@
+# app/services/prompt_agente.py
+"""Prompt del agente de outfits y utilidades asociadas (filtrado de prendas, validación de salida del LLM).
+
+SYSTEM_PROMPT, EXPRESION_POR_CONFIANZA y construir_mensaje_usuario están
+copiados tal cual de scripts/verificar_prompt_agente.py, donde fueron
+verificados contra la API real de Groq. No modificar ese texto sin volver
+a correr la verificación.
+"""
+
+SYSTEM_PROMPT = """Eres un asesor de vestuario. Recomiendas outfits usando UNICAMENTE las
+prendas del guardarropa que se te entrega.
+
+REGLAS
+1. Cada prenda se identifica por su indice entero. Usa solo indices que
+   aparezcan en la lista. Nunca inventes uno.
+2. Cada outfit combina prendas coherentes entre si y apropiadas para el
+   evento y el clima indicados.
+3. Los 3 outfits deben ser distintos entre si.
+4. Para referirte al clima usa exactamente la expresion indicada en el
+   bloque CLIMA. Si la confianza no es alta, NUNCA afirmes el clima como
+   un hecho.
+5. Si el bloque de clima trae la marca (derivado), su descripcion es un
+   promedio calculado, no una observacion. Tratala como tendencia.
+
+FORMATO
+Responde SOLO con un objeto JSON valido. Sin markdown, sin texto antes
+ni despues. Estructura exacta:
+
+{"outfits":[{"nombre":"","prendas":[],"justificacion":""}],"notas":[]}
+
+- exactamente 3 outfits
+- "nombre": maximo 4 palabras
+- "prendas": arreglo de indices enteros
+- "justificacion": maximo 2 frases
+- "notas": 0 a 2 elementos, una frase cada uno, senalando que le falta al
+  guardarropa para este evento. Si no falta nada, arreglo vacio."""
+
+
+EXPRESION_POR_CONFIANZA = {
+    "alta": "se pronostica",
+    "media": "la proyeccion indica",
+    "baja": "tipicamente en esa epoca",
+}
+
+
+def construir_mensaje_usuario(descripcion_evento: str, clima: dict, prendas: list[dict]) -> str:
+    marca = " (derivado)" if clima["fuente"] == "climatologia" else ""
+    expresion = EXPRESION_POR_CONFIANZA.get(clima["confianza"], "la proyeccion indica")
+    lineas = "\n".join(
+        f"{i} {p['tipo']} {p['color']} {p['temporada']}" for i, p in enumerate(prendas)
+    )
+    return f"""EVENTO: {descripcion_evento}
+LUGAR: {clima["lugar"]}
+FECHA: {clima["fecha_objetivo"]}
+
+CLIMA (confianza {clima["confianza"]}){marca}
+Usa la expresion: "{expresion}"
+{clima["temp_min"]}-{clima["temp_max"]}C, promedio {clima["temp_promedio"]}C
+humedad {clima["humedad"]}%, lluvia {clima["precipitacion_mm"]}mm, dias con lluvia {clima["dias_con_lluvia_pct"]}%
+{clima["descripcion"]}
+
+GUARDARROPA
+{lineas}"""
+
+
+def filtrar_prendas(prendas: list[dict], temp_promedio: float, limite: int = 40) -> list[dict]:
+    """
+    Reduce el guardarropa a las prendas más relevantes para el clima, capado a `limite`.
+
+    Si temp_promedio >= 24 descarta las de temporada "invierno"; si es <= 15
+    descarta las de "verano"; en el rango intermedio no descarta por
+    temporada. Las de "todo_el_año" nunca se descartan. El resultado se
+    ordena por veces_usado descendente y se capa a `limite`.
+
+    Si el filtro por temporada deja menos de 3 prendas, se descarta el
+    filtro y se devuelve la lista original ordenada y capada: es preferible
+    recomendar con prendas de temporada inadecuada que no poder recomendar
+    (por ejemplo, un guardarropa pequeño compuesto solo de ropa de invierno
+    en un evento de clima cálido no debe vaciarse a cero opciones).
+    """
+    if temp_promedio >= 24:
+        filtradas = [p for p in prendas if p["temporada"] != "invierno"]
+    elif temp_promedio <= 15:
+        filtradas = [p for p in prendas if p["temporada"] != "verano"]
+    else:
+        filtradas = list(prendas)
+
+    if len(filtradas) < 3:
+        filtradas = list(prendas)
+
+    filtradas.sort(key=lambda p: p["veces_usado"], reverse=True)
+    return filtradas[:limite]
+
+
+def validar_outfits(contenido_json, n_prendas: int) -> tuple[list[dict], list[dict]]:
+    """
+    Clasifica los outfits devueltos por el LLM en válidos y descartados.
+
+    No repara outfits parcialmente inválidos (p. ej. quitándoles un índice
+    inventado): un outfit al que se le quita una prenda deja de corresponder
+    a su justificación, así que se descarta completo. No lanza excepciones;
+    solo clasifica — decidir qué hacer con cero outfits válidos es
+    responsabilidad del controller.
+    """
+    outfits_validos: list[dict] = []
+    descartados: list[dict] = []
+
+    if not isinstance(contenido_json, dict):
+        return outfits_validos, [{"outfit": contenido_json, "motivo": "contenido_json no es un dict"}]
+
+    outfits = contenido_json.get("outfits")
+    if not isinstance(outfits, list):
+        return outfits_validos, [{"outfit": outfits, "motivo": "'outfits' no es una lista"}]
+
+    claves_esperadas = {"nombre", "prendas", "justificacion"}
+
+    for outfit in outfits:
+        if not isinstance(outfit, dict):
+            descartados.append({"outfit": outfit, "motivo": "no es un dict"})
+            continue
+
+        if set(outfit.keys()) != claves_esperadas:
+            descartados.append({"outfit": outfit, "motivo": f"claves inesperadas: {sorted(outfit.keys())}"})
+            continue
+
+        prendas = outfit.get("prendas")
+        if not isinstance(prendas, list) or len(prendas) == 0:
+            descartados.append({"outfit": outfit, "motivo": "'prendas' no es una lista no vacía"})
+            continue
+
+        if not all(isinstance(i, int) for i in prendas):
+            descartados.append({"outfit": outfit, "motivo": "'prendas' contiene elementos no enteros"})
+            continue
+
+        fuera_de_rango = [i for i in prendas if not (0 <= i <= n_prendas - 1)]
+        if fuera_de_rango:
+            descartados.append({"outfit": outfit, "motivo": f"índices fuera de rango: {fuera_de_rango}"})
+            continue
+
+        outfits_validos.append(outfit)
+
+    return outfits_validos, descartados

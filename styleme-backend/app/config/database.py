@@ -55,6 +55,11 @@ async def crear_indices():
     await database.db.invitados.create_index("device_id")
     await database.db.invitados.create_index("expira_en")
 
+    # Índice en usuario_id + creado_en para recomendaciones de evento
+    await database.db.recomendaciones_evento.create_index(
+        [("usuario_id", 1), ("creado_en", -1)]
+    )
+
     logger.info("✅ Índices MongoDB creados")
 
 

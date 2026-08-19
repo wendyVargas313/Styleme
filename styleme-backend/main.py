@@ -23,6 +23,7 @@ from app.views.recomendacion_router import router as recomendacion_router
 from app.views.historial_router import router as historial_router
 from app.views.invitado_router import router as invitado_router
 from app.views.tryon_router import router as tryon_router
+from app.views.agente_router import router as agente_router
 
 # Configurar logging
 logging.basicConfig(
@@ -132,6 +133,7 @@ app.include_router(recomendacion_router, prefix=PREFIX)
 app.include_router(historial_router, prefix=PREFIX)
 app.include_router(invitado_router, prefix=PREFIX)
 app.include_router(tryon_router, prefix=PREFIX)
+app.include_router(agente_router, prefix=PREFIX)
 
 
 # ─── ENDPOINT DE SALUD ───────────────────────────────────
