@@ -63,6 +63,35 @@ class ImageService {
     return archivos.take(max).map((x) => File(x.path)).toList();
   }
 
+  // Selecciona varias imágenes de galería para agregar prendas, con la misma
+  // compresión que tomarFoto/seleccionarDeGaleria (lo que recibe YOLO no
+  // cambia). `recortadas` es true si el picker devolvió más de `max`.
+  static Future<({List<File> archivos, bool recortadas})> seleccionarVarias({
+    int max = 10,
+  }) async {
+    if (max <= 0) return (archivos: <File>[], recortadas: false);
+
+    if (max == 1) {
+      final archivo = await seleccionarDeGaleria();
+      return (
+        archivos: archivo == null ? <File>[] : [archivo],
+        recortadas: false,
+      );
+    }
+
+    // image_picker exige limit >= 2
+    final seleccion = await _picker.pickMultiImage(
+      maxWidth: 1080,
+      maxHeight: 1080,
+      imageQuality: 85,
+      limit: max,
+    );
+    return (
+      archivos: seleccion.take(max).map((x) => File(x.path)).toList(),
+      recortadas: seleccion.length > max,
+    );
+  }
+
   // Verifica que el archivo no exceda 5MB
   static Future<bool> esValidoTamanio(File archivo) async {
     final bytes = await archivo.length();

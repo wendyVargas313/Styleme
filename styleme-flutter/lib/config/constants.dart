@@ -15,8 +15,8 @@ class AppConstants {
   };
 
   static const Map<String, String> momentoEtiquetas = {
-    'dia': 'Día · calor',
-    'noche': 'Noche · frío',
+    'dia': 'Día',
+    'noche': 'Noche',
     'ambos': 'Ambos',
   };
 

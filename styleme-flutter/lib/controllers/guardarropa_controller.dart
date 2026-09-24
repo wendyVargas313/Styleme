@@ -10,6 +10,19 @@ import 'package:styleme/services/segmentacion_service.dart';
 
 enum GuardarropaEstado { inicial, cargando, listo, agregando, error }
 
+// Clasificación del fallo al subir una prenda, para que la cola decida si
+// sigue con la siguiente foto o se detiene.
+enum TipoErrorSubida {
+  // Sin red, conexión rechazada, timeout de conexión o de envío: el servidor
+  // no recibió el archivo completo, reintentar es seguro.
+  conexion,
+  // receiveTimeout: el archivo llegó y el backend puede seguir procesándolo;
+  // la prenda probablemente se guardó. No se debe reintentar (duplicados).
+  sinConfirmar,
+  // Error de esa foto en particular (413, 400, 422, 500, etc.).
+  deLaFoto,
+}
+
 class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   final ApiService _api = ApiService();
 
@@ -17,6 +30,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   List<PrendaModel> _prendas = [];
   Map<String, dynamic> _stats = {};
   String? _mensajeError;
+  TipoErrorSubida? _ultimoErrorSubida;
   int _totalPrendas = 0;
   int _paginaActual = 1;
   bool _ultimoRefrescoFallo = false;
@@ -30,6 +44,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   List<PrendaModel> get prendas => _prendas;
   Map<String, dynamic> get stats => _stats;
   String? get mensajeError => _mensajeError;
+  TipoErrorSubida? get ultimoErrorSubida => _ultimoErrorSubida;
   int get totalPrendas => _totalPrendas;
   String? get filtroTipo => _filtroTipo;
   String? get filtroColor => _filtroColor;
@@ -95,15 +110,23 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     notifyListeners();
   }
 
-  // Agregar prenda con imagen
+  // Agregar prenda con imagen.
+  // Con notificar: false (cola de varias fotos) no cambia el estado global ni
+  // notifica en cada foto: solo inserta la prenda en la lista local y deja
+  // el fallo en mensajeError/ultimoErrorSubida. La cola recarga una vez al
+  // final.
   Future<PrendaModel?> agregarPrenda({
     required File imagen,
     required String momento,
     String notas = '',
+    bool notificar = true,
   }) async {
-    _estado = GuardarropaEstado.agregando;
     _mensajeError = null;
-    notifyListeners();
+    _ultimoErrorSubida = null;
+    if (notificar) {
+      _estado = GuardarropaEstado.agregando;
+      notifyListeners();
+    }
 
     try {
       // Recorte de fondo hecho en el celular (ML Kit); imagen sigue siendo
@@ -140,16 +163,48 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
         final nuevaPrenda = PrendaModel.fromJson(data['prenda']);
         _prendas.insert(0, nuevaPrenda);
         _totalPrendas++;
-        _estado = GuardarropaEstado.listo;
-        notifyListeners();
+        if (notificar) {
+          _estado = GuardarropaEstado.listo;
+          notifyListeners();
+        }
         return nuevaPrenda;
       }
+      _registrarErrorSubida(
+          TipoErrorSubida.deLaFoto, 'Error al agregar la prenda', notificar);
     } catch (e) {
-      _mensajeError = _parsearError(e);
+      final tipo = _clasificarErrorSubida(e);
+      _registrarErrorSubida(tipo, _parsearError(e, tipo), notificar);
+    }
+    return null;
+  }
+
+  void _registrarErrorSubida(
+      TipoErrorSubida tipo, String mensaje, bool notificar) {
+    _ultimoErrorSubida = tipo;
+    _mensajeError = mensaje;
+    if (notificar) {
       _estado = GuardarropaEstado.error;
       notifyListeners();
     }
-    return null;
+  }
+
+  TipoErrorSubida _clasificarErrorSubida(Object e) {
+    if (e is SocketException) return TipoErrorSubida.conexion;
+    if (e is! DioException) return TipoErrorSubida.deLaFoto;
+    switch (e.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+        return TipoErrorSubida.conexion;
+      case DioExceptionType.receiveTimeout:
+        return TipoErrorSubida.sinConfirmar;
+      case DioExceptionType.unknown:
+        return e.error is SocketException
+            ? TipoErrorSubida.conexion
+            : TipoErrorSubida.deLaFoto;
+      default:
+        return TipoErrorSubida.deLaFoto;
+    }
   }
 
   // Eliminar prenda
@@ -190,9 +245,28 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     cargarPrendas(resetear: true);
   }
 
-  String _parsearError(dynamic e) {
-    if (e.toString().contains('413')) return 'La imagen es demasiado grande (máx 5MB)';
-    if (e.toString().contains('400')) return 'Formato de imagen no válido';
+  String _parsearError(Object e, TipoErrorSubida tipo) {
+    switch (tipo) {
+      case TipoErrorSubida.conexion:
+        return 'Se perdió la conexión. Reintenta cuando vuelva.';
+      case TipoErrorSubida.sinConfirmar:
+        return 'El servidor tardó en responder; la prenda probablemente se '
+            'guardó. Revisa el armario.';
+      case TipoErrorSubida.deLaFoto:
+        break;
+    }
+    if (e is DioException) {
+      final codigo = e.response?.statusCode;
+      final data = e.response?.data;
+      final detalle =
+          (data is Map && data['detail'] is String) ? data['detail'] as String : null;
+      if (codigo == 413) return 'La imagen es demasiado grande (máx 5MB)';
+      if (codigo == 400) return detalle ?? 'Formato de imagen no válido';
+      if (codigo == 422) return detalle ?? 'Datos de la prenda no válidos';
+      if (codigo != null && codigo >= 500) {
+        return 'Error del servidor al procesar esta foto';
+      }
+    }
     return 'Error al agregar la prenda';
   }
 }
