@@ -2,23 +2,43 @@
 import io
 import logging
 import os
+import threading
+import time
 import uuid
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 from PIL import Image
 from bson import ObjectId
 from fastapi import HTTPException, status, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from app.config.database import get_db
 from app.config.settings import settings
 from app.models.prenda_model import PrendaModel
-from app.ml.ml_agent import ml_agent
+from app.ml.ml_agent import ml_agent, ml_lock
+from app.services.imagen_service import normalizar_orientacion
 
 logger = logging.getLogger(__name__)
 
 # Extensiones permitidas
 EXTENSIONES_PERMITIDAS = {".jpg", ".jpeg", ".png"}
 TIPOS_MIME_PERMITIDOS = {"image/jpeg", "image/jpg", "image/png"}
+
+# Sesión u2net de rembg: perezosa, creada una sola vez y reutilizada
+# (evita recargar el modelo ONNX en cada subida de prenda).
+_rembg_session = None
+_rembg_session_lock = threading.Lock()
+
+
+def _obtener_rembg_session():
+    global _rembg_session
+    if _rembg_session is None:
+        with _rembg_session_lock:
+            if _rembg_session is None:
+                from rembg import new_session
+                _rembg_session = new_session("u2net")
+    return _rembg_session
 
 
 async def validar_imagen(imagen: UploadFile) -> bytes:
@@ -43,6 +63,7 @@ async def validar_imagen(imagen: UploadFile) -> bytes:
 
     # Leer contenido
     contenido = await imagen.read()
+    contenido = normalizar_orientacion(contenido)
 
     # Verificar tamaño
     tamanio_mb = len(contenido) / (1024 * 1024)
@@ -53,6 +74,27 @@ async def validar_imagen(imagen: UploadFile) -> bytes:
         )
 
     return contenido
+
+
+def _centrar_en_tarjeta_blanca(img_rgba: Image.Image, size: int = 512) -> bytes:
+    """
+    Centra una imagen RGBA sobre un fondo blanco size x size y la codifica
+    a JPEG. Compartida por el flujo con rembg y el flujo con recorte hecho
+    en el dispositivo.
+    """
+    fondo = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+    img_rgba.thumbnail((size, size), Image.LANCZOS)
+    offset_x = (size - img_rgba.width) // 2
+    offset_y = (size - img_rgba.height) // 2
+
+    # Pegar usando el canal alpha como máscara para bordes suaves
+    fondo.paste(img_rgba, (offset_x, offset_y), mask=img_rgba.split()[3])
+
+    # Convertir a RGB y guardar como JPEG
+    fondo_rgb = fondo.convert("RGB")
+    buf_salida = io.BytesIO()
+    fondo_rgb.save(buf_salida, format="JPEG", quality=92)
+    return buf_salida.getvalue()
 
 
 def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float = 0.12) -> bytes:
@@ -89,7 +131,8 @@ def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float =
         img.save(buf_entrada, format="PNG")
         buf_entrada.seek(0)
 
-        resultado_bytes = rembg_remove(buf_entrada.read())
+        with ml_lock:
+            resultado_bytes = rembg_remove(buf_entrada.read(), session=_obtener_rembg_session())
         img_sin_fondo = Image.open(io.BytesIO(resultado_bytes)).convert("RGBA")
 
     except Exception as e:
@@ -98,20 +141,43 @@ def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float =
         img_sin_fondo = img.convert("RGBA")
 
     # Paso 4: centrar sobre fondo blanco 512x512
-    size = 512
-    fondo = Image.new("RGBA", (size, size), (255, 255, 255, 255))
-    img_sin_fondo.thumbnail((size, size), Image.LANCZOS)
-    offset_x = (size - img_sin_fondo.width) // 2
-    offset_y = (size - img_sin_fondo.height) // 2
+    return _centrar_en_tarjeta_blanca(img_sin_fondo)
 
-    # Pegar usando el canal alpha como máscara para bordes suaves
-    fondo.paste(img_sin_fondo, (offset_x, offset_y), mask=img_sin_fondo.split()[3])
 
-    # Convertir a RGB y guardar como JPEG
-    fondo_rgb = fondo.convert("RGB")
-    buf_salida = io.BytesIO()
-    fondo_rgb.save(buf_salida, format="JPEG", quality=92)
-    return buf_salida.getvalue()
+def generar_tarjeta_desde_recorte(png_bytes: bytes, padding_pct: float = 0.12) -> bytes:
+    """
+    Genera la tarjeta 512x512 a partir de un recorte PNG con transparencia
+    hecho en el dispositivo (p. ej. ML Kit Subject Segmentation), sin pasar
+    por rembg. No toma ml_lock: no hay inferencia de modelo, solo PIL.
+
+    Raises:
+        ValueError: si el canal alfa no tiene un sujeto detectable.
+    """
+    img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+
+    # Contorno del sujeto a partir del canal alfa (umbral > 10)
+    alfa = img.split()[3]
+    bbox_alfa = alfa.point(lambda a: 255 if a > 10 else 0).getbbox()
+
+    if bbox_alfa is None:
+        raise ValueError("El recorte no tiene un sujeto detectable (canal alfa vacío)")
+
+    x1, y1, x2, y2 = bbox_alfa
+    area_sujeto = (x2 - x1) * (y2 - y1)
+    area_total = img.width * img.height
+    if area_total == 0 or (area_sujeto / area_total) < 0.01:
+        raise ValueError("El área del sujeto en el recorte es menor al 1% de la imagen")
+
+    # Recorte al contorno con el mismo margen que usa el flujo con rembg
+    pad_x = int((x2 - x1) * padding_pct)
+    pad_y = int((y2 - y1) * padding_pct)
+    x1 = max(0, x1 - pad_x)
+    y1 = max(0, y1 - pad_y)
+    x2 = min(img.width, x2 + pad_x)
+    y2 = min(img.height, y2 + pad_y)
+    img = img.crop((x1, y1, x2, y2))
+
+    return _centrar_en_tarjeta_blanca(img)
 
 
 async def guardar_imagen_local(
@@ -148,20 +214,23 @@ async def agregar_prenda(
     nombre_imagen: str,
     temporada: str,
     notas: str,
-    db
+    db,
+    imagen_sin_fondo: Optional[UploadFile] = None
 ) -> dict:
     """
     Agrega una nueva prenda al guardarropa del usuario.
-    
+
     Proceso:
-    1. Procesar imagen con el agente ML (YOLO + KMeans)
-    2. Guardar imagen en /uploads/
-    3. Crear documento en MongoDB
-    
+    1. Procesar imagen con el agente ML (YOLO + KMeans) — siempre sobre `imagen`
+    2. Generar tarjeta 512x512 (desde imagen_sin_fondo si llega y es válida,
+       si no con el flujo actual de rembg)
+    3. Guardar imagen en /uploads/
+    4. Crear documento en MongoDB
+
     Returns:
         dict con éxito y datos de la prenda detectada
     """
-    # Procesar imagen con ML
+    # Procesar imagen con ML — siempre sobre la foto original
     logger.info(f"🔍 Procesando imagen con ML para usuario {usuario_id}")
     resultado_ml = await ml_agent.procesar_imagen(imagen_bytes)
 
@@ -173,9 +242,39 @@ async def agregar_prenda(
     logger.info(f"   Tipo detectado: {tipo} ({confianza:.1%})")
     logger.info(f"   Color detectado: {color}")
 
-    # Recortar prenda y colocar en tarjeta fondo blanco
-    imagen_tarjeta = generar_imagen_tarjeta(imagen_bytes, bbox)
-    logger.info("   Imagen procesada: recorte + fondo blanco 512x512")
+    # Generar tarjeta: preferir el recorte del dispositivo si llega y es válido
+    t_inicio_tarjeta = time.perf_counter()
+    imagen_tarjeta = None
+    ruta_usada = None
+
+    if imagen_sin_fondo is not None:
+        contenido_sin_fondo = await imagen_sin_fondo.read()
+        content_type_sf = imagen_sin_fondo.content_type or ""
+        extension_sf = Path(imagen_sin_fondo.filename or "").suffix.lower()
+        es_png = (content_type_sf in {"image/png"}) or (extension_sf == ".png")
+        tamanio_mb_sf = len(contenido_sin_fondo) / (1024 * 1024)
+
+        if not es_png or tamanio_mb_sf > settings.MAX_IMAGE_SIZE_MB:
+            logger.warning(
+                f"imagen_sin_fondo inválida (tipo={content_type_sf!r}, "
+                f"tamaño={tamanio_mb_sf:.2f}MB) — usando flujo rembg"
+            )
+        else:
+            try:
+                imagen_tarjeta = await run_in_threadpool(
+                    generar_tarjeta_desde_recorte, contenido_sin_fondo
+                )
+                ruta_usada = "tarjeta desde recorte del dispositivo"
+            except Exception as e:
+                logger.warning(f"generar_tarjeta_desde_recorte falló ({e}) — usando flujo rembg")
+                imagen_tarjeta = None
+
+    if imagen_tarjeta is None:
+        imagen_tarjeta = await run_in_threadpool(generar_imagen_tarjeta, imagen_bytes, bbox)
+        ruta_usada = "tarjeta con rembg"
+
+    duracion_ms = (time.perf_counter() - t_inicio_tarjeta) * 1000
+    logger.info(f"   Imagen procesada: {ruta_usada} ({duracion_ms:.0f} ms)")
 
     # Guardar imagen procesada localmente
     imagen_url = await guardar_imagen_local(imagen_tarjeta, usuario_id, nombre_imagen)

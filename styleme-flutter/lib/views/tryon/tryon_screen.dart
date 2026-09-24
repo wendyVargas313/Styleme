@@ -8,13 +8,35 @@ import 'package:provider/provider.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/tryon_controller.dart';
 
-class TryonScreen extends StatelessWidget {
+class TryonScreen extends StatefulWidget {
   const TryonScreen({super.key});
 
   @override
+  State<TryonScreen> createState() => _TryonScreenState();
+}
+
+class _TryonScreenState extends State<TryonScreen> {
+  late final TryonController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TryonController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.cargarFotoGuardada();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => TryonController(),
+    return ChangeNotifierProvider.value(
+      value: _controller,
       child: const _TryonView(),
     );
   }
@@ -85,6 +107,9 @@ class _TryonView extends StatelessWidget {
             placeholder: 'Tu foto de cuerpo completo',
             icono: Icons.person_outline,
             onTap: () => _seleccionarImagen(context, esPersona: true),
+            cargando: ctrl.cargandoFotoGuardada,
+            subtituloExtra:
+                ctrl.usandoFotoGuardada ? 'Tu foto guardada · toca para cambiar' : null,
           ),
           const SizedBox(height: 20),
           _label('2. Sube la prenda'),
@@ -130,9 +155,11 @@ class _TryonView extends StatelessWidget {
     required String placeholder,
     required IconData icono,
     required VoidCallback onTap,
+    bool cargando = false,
+    String? subtituloExtra,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: cargando ? null : onTap,
       child: Container(
         height: 200,
         width: double.infinity,
@@ -146,34 +173,67 @@ class _TryonView extends StatelessWidget {
             width: imagen != null ? 2 : 1,
           ),
         ),
-        child: imagen != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.file(imagen, fit: BoxFit.cover),
+        child: cargando
+            ? const Center(
+                child: CircularProgressIndicator(color: StyleMeTheme.primary),
               )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icono, color: StyleMeTheme.textSecondary, size: 40),
-                  const SizedBox(height: 10),
-                  Text(
-                    placeholder,
-                    style: GoogleFonts.poppins(
-                      color: StyleMeTheme.textSecondary,
-                      fontSize: 13,
-                    ),
+            : imagen != null
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.file(imagen, fit: BoxFit.cover),
+                      ),
+                      if (subtituloExtra != null)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xB3000000),
+                              borderRadius: BorderRadius.vertical(
+                                bottom: Radius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              subtituloExtra,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icono, color: StyleMeTheme.textSecondary, size: 40),
+                      const SizedBox(height: 10),
+                      Text(
+                        placeholder,
+                        style: GoogleFonts.poppins(
+                          color: StyleMeTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Toca para seleccionar',
+                        style: GoogleFonts.poppins(
+                          color: StyleMeTheme.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Toca para seleccionar',
-                    style: GoogleFonts.poppins(
-                      color: StyleMeTheme.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
   }

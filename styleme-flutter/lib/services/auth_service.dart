@@ -60,6 +60,13 @@ class AuthService {
     await _storage.cerrarSesion();
   }
 
+  // Obtiene la URL relativa de la foto de perfil guardada (o null si no tiene)
+  Future<String?> obtenerFotoPerfilUrl() async {
+    final response = await _api.get(ApiConfig.fotoPerfil);
+    final data = response.data as Map<String, dynamic>;
+    return data['foto_perfil_url'] as String?;
+  }
+
   // Sube la foto de perfil como multipart y retorna la URL guardada
   Future<String> subirFotoPerfil(File foto) async {
     final formData = FormData.fromMap({

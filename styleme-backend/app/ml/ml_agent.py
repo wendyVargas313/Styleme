@@ -2,9 +2,12 @@
 # Orquesta los 3 modelos: YOLO + KMeans Color + Recomendador
 import logging
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from fastapi.concurrency import run_in_threadpool
 
 from app.ml.detector import DetectorPrendas
 from app.ml.color_classifier import ClasificadorColor
@@ -12,6 +15,10 @@ from app.ml.recommender import RecomendadorOutfits
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Serializa la inferencia (YOLO, KMeans, rembg): los modelos no son seguros
+# entre hilos concurrentes y correrlos en paralelo satura la CPU del contenedor.
+ml_lock = threading.Lock()
 
 
 class StyleMeAgent:
@@ -72,37 +79,33 @@ class StyleMeAgent:
             logger.error(f"❌ Error inicializando ML Agent: {e}")
             raise
 
-    async def procesar_imagen(self, imagen_bytes: bytes) -> dict:
+    def _procesar_imagen_sync(self, imagen_bytes: bytes) -> dict:
         """
-        Pipeline completo de procesamiento de imagen.
-        imagen → YOLO (detección) → recorte → KMeans (color) → resultado
-        
-        Args:
-            imagen_bytes: Imagen en bytes (JPG/PNG)
-        
-        Returns:
-            dict con tipo, color, confianza, bbox
+        Cuerpo síncrono de procesar_imagen. Corre en un hilo del threadpool
+        (ver procesar_imagen) y toma ml_lock durante toda la sección de
+        inferencia porque YOLO + KMeans se ejecutan sobre la misma imagen.
         """
-        # Paso 1: Detección con YOLO
-        resultado_yolo = self.detector.detectar(imagen_bytes, conf=0.25)
+        with ml_lock:
+            # Paso 1: Detección con YOLO
+            resultado_yolo = self.detector.detectar(imagen_bytes, conf=0.25)
 
-        tipo = resultado_yolo.get("tipo", "not sure")
-        confianza = resultado_yolo.get("confianza", 0.0)
-        bbox = resultado_yolo.get("bbox", [])
-        imagen_pil = resultado_yolo.get("imagen_pil")
+            tipo = resultado_yolo.get("tipo", "not sure")
+            confianza = resultado_yolo.get("confianza", 0.0)
+            bbox = resultado_yolo.get("bbox", [])
+            imagen_pil = resultado_yolo.get("imagen_pil")
 
-        # Paso 2: Recortar la prenda si hay bbox
-        if bbox and imagen_pil:
-            imagen_recortada = self.detector.recortar_prenda(imagen_pil, bbox)
-        elif imagen_pil:
-            imagen_recortada = imagen_pil
-        else:
-            from PIL import Image
-            import io
-            imagen_recortada = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+            # Paso 2: Recortar la prenda si hay bbox
+            if bbox and imagen_pil:
+                imagen_recortada = self.detector.recortar_prenda(imagen_pil, bbox)
+            elif imagen_pil:
+                imagen_recortada = imagen_pil
+            else:
+                from PIL import Image
+                import io
+                imagen_recortada = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
 
-        # Paso 3: Clasificar color de la prenda recortada
-        color = self.color_clf.predecir(imagen_recortada)
+            # Paso 3: Clasificar color de la prenda recortada
+            color = self.color_clf.predecir(imagen_recortada)
 
         return {
             "tipo": tipo,
@@ -112,6 +115,19 @@ class StyleMeAgent:
             "detectado": resultado_yolo.get("detectado", False),
             "todas_detecciones": resultado_yolo.get("todas_detecciones", [])
         }
+
+    async def procesar_imagen(self, imagen_bytes: bytes) -> dict:
+        """
+        Pipeline completo de procesamiento de imagen.
+        imagen → YOLO (detección) → recorte → KMeans (color) → resultado
+
+        Args:
+            imagen_bytes: Imagen en bytes (JPG/PNG)
+
+        Returns:
+            dict con tipo, color, confianza, bbox
+        """
+        return await run_in_threadpool(self._procesar_imagen_sync, imagen_bytes)
 
     async def recomendar_outfit(
         self,

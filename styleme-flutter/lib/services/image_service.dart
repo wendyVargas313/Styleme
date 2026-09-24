@@ -1,9 +1,33 @@
 // StyleMe - Servicio de manejo de imágenes
+import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 class ImageService {
   static final ImagePicker _picker = ImagePicker();
+
+  // Lee un archivo de imagen, hornea la orientación EXIF en los píxeles
+  // y re-codifica a JPG. Si la imagen no se puede decodificar, hace
+  // fallback a los bytes originales sin romper el flujo.
+  static Future<Uint8List> corregirOrientacion(File archivo) async {
+    final bytesOriginales = await archivo.readAsBytes();
+
+    final imagenDecodificada = img.decodeImage(bytesOriginales);
+    if (imagenDecodificada == null) {
+      developer.log(
+        'No se pudo decodificar la imagen (${archivo.path}); '
+        'se usan los bytes originales sin corregir orientación EXIF.',
+        name: 'TryonService',
+        level: 900,
+      );
+      return bytesOriginales;
+    }
+
+    final imagenOrientada = img.bakeOrientation(imagenDecodificada);
+    return Uint8List.fromList(img.encodeJpg(imagenOrientada, quality: 90));
+  }
 
   // Selecciona imagen desde la cámara
   static Future<File?> tomarFoto() async {

@@ -18,6 +18,8 @@ class GuardarropaScreen extends StatefulWidget {
 }
 
 class _GuardarropaScreenState extends State<GuardarropaScreen> {
+  bool _falloYaAvisado = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,9 +28,26 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
     });
   }
 
+  void _avisarSiFallo(GuardarropaController ctrl) {
+    if (ctrl.ultimoRefrescoFallo && !_falloYaAvisado) {
+      _falloYaAvisado = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sin conexión. Mostrando la última información disponible.'),
+          ),
+        );
+      });
+    } else if (!ctrl.ultimoRefrescoFallo) {
+      _falloYaAvisado = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = context.watch<GuardarropaController>();
+    _avisarSiFallo(ctrl);
 
     return Scaffold(
       backgroundColor: StyleMeTheme.background,
@@ -181,6 +200,33 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
     if (ctrl.estado == GuardarropaEstado.cargando && ctrl.prendas.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: StyleMeTheme.primary),
+      );
+    }
+
+    if (ctrl.estado == GuardarropaEstado.error && ctrl.prendas.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off, color: StyleMeTheme.textSecondary, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              ctrl.mensajeError ?? 'No se pudo cargar tu armario',
+              style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => ctrl.cargarPrendas(resetear: true),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Reintentar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: StyleMeTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       );
     }
 

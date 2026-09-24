@@ -13,6 +13,7 @@ services:
       dockerfile: styleme-backend/Dockerfile
     ports:
       - "8000:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
     env_file:
       - styleme-backend/.env
     environment:
@@ -20,7 +21,9 @@ services:
       ML_MODELS_PATH: /app/models
       UPLOADS_PATH: /app/uploads
       YOLO_CONFIG_DIR: /tmp/Ultralytics
+      WATCHFILES_FORCE_POLLING: "true"
     volumes:
+      - ./styleme-backend/app:/app/app
       - ./styleme-backend/uploads:/app/uploads
       - u2net-cache:/root/.u2net
     depends_on:

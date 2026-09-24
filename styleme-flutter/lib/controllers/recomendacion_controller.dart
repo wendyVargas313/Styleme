@@ -1,6 +1,7 @@
 // StyleMe - Controller de Recomendaciones (Provider)
 import 'package:flutter/foundation.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/controllers/mixins/recarga_inteligente.dart';
 import 'package:styleme/models/outfit_ia_model.dart';
 import 'package:styleme/models/outfit_model.dart';
 import 'package:styleme/models/prenda_model.dart';
@@ -8,14 +9,18 @@ import 'package:styleme/services/api_service.dart';
 
 enum RecomendacionEstado { inicial, cargando, listo, error }
 
-class RecomendacionController extends ChangeNotifier {
+class RecomendacionController extends ChangeNotifier with RecargaInteligente {
   final ApiService _api = ApiService();
 
   // ── Estado outfits diarios ──────────────────────────────────
+  // El mixin RecargaInteligente (haceFaltaRecargar/registrarCarga...) solo
+  // se usa para los outfits diarios de esta sección. Los outfits IA de más
+  // abajo NUNCA lo tocan — se manejan solo con _generandoIA.
   RecomendacionEstado _estado = RecomendacionEstado.inicial;
   OutfitModel? _outfitActual;
   List<OutfitModel> _outfitsDelDia = [];
   String? _mensajeError;
+  bool _ultimoRefrescoFallo = false;
 
   // ── Estado outfits IA ───────────────────────────────────────
   List<OutfitIAModel> _outfitsIA = [];
@@ -28,6 +33,16 @@ class RecomendacionController extends ChangeNotifier {
   List<OutfitModel> get outfitsDelDia => _outfitsDelDia;
   String? get mensajeError => _mensajeError;
   bool get estaCargando => _estado == RecomendacionEstado.cargando;
+  bool get ultimoRefrescoFallo => _ultimoRefrescoFallo;
+
+  // Recarga los outfits diarios solo si hace falta. NUNCA toca los
+  // outfits IA (esos se disparan aparte, deliberadamente). Si ya hay una
+  // carga en curso (diaria o de generarOutfit, comparten _estado), no
+  // dispara otra.
+  Future<void> refrescarSiHaceFalta() async {
+    if (_estado == RecomendacionEstado.cargando) return;
+    if (haceFaltaRecargar) await cargarOutfitsDiarios();
+  }
 
   // Getters IA
   List<OutfitIAModel> get outfitsIA => _outfitsIA;
@@ -70,19 +85,26 @@ class RecomendacionController extends ChangeNotifier {
           generadoEn: data['generado_en'] ?? '',
         );
         _estado = RecomendacionEstado.listo;
-        notifyListeners();
         return _outfitActual;
+      } else {
+        // La respuesta llegó 200 pero sin success == true: antes esto
+        // dejaba _estado atascado en "cargando" para siempre.
+        _mensajeError = 'No se pudo generar el outfit. Intenta de nuevo.';
+        _estado = RecomendacionEstado.error;
+        return null;
       }
     } catch (e) {
       _mensajeError = _parsearError(e);
       _estado = RecomendacionEstado.error;
+      return null;
+    } finally {
       notifyListeners();
     }
-    return null;
   }
 
   // Carga los outfits del día
   Future<void> cargarOutfitsDiarios({String temporada = 'invierno'}) async {
+    final huboDatosPrevios = _outfitsDelDia.isNotEmpty;
     _estado = RecomendacionEstado.cargando;
     _mensajeError = null;
     notifyListeners();
@@ -96,6 +118,7 @@ class RecomendacionController extends ChangeNotifier {
       final data = response.data as Map<String, dynamic>;
       final outfitsJson = data['outfits_del_dia'] as List? ?? [];
 
+      // Solo se reemplaza la lista si la respuesta fue exitosa.
       _outfitsDelDia = outfitsJson.map((o) {
         final oMap = o as Map<String, dynamic>;
         return OutfitModel(
@@ -113,9 +136,18 @@ class RecomendacionController extends ChangeNotifier {
       }).toList();
 
       _estado = RecomendacionEstado.listo;
+      _ultimoRefrescoFallo = false;
+      registrarCargaExitosa();
     } catch (e) {
+      registrarCargaFallida();
       _mensajeError = _parsearError(e);
-      _estado = RecomendacionEstado.error;
+      if (huboDatosPrevios) {
+        _estado = RecomendacionEstado.listo;
+        _ultimoRefrescoFallo = true;
+      } else {
+        _estado = RecomendacionEstado.error;
+        _ultimoRefrescoFallo = false;
+      }
     }
     notifyListeners();
   }

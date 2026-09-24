@@ -25,7 +25,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _tabActual = 0;
   final String _temporada = 'invierno';
 
@@ -37,15 +37,30 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   // Permite que widgets hijos naveguen entre tabs
-  void navegarA(int index) => setState(() => _tabActual = index);
+  void navegarA(int index) => _cambiarTab(index);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Cargar datos iniciales
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cargarDatosIniciales();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Vuelta a primer plano: refresca (solo si hace falta) la pestaña visible.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refrescarPestana(_tabActual);
+    }
   }
 
   Future<void> _cargarDatosIniciales() async {
@@ -60,6 +75,30 @@ class _HomeScreenState extends State<HomeScreen> {
     recCtrl.cargarOutfitsIA(temporada: _temporada);
   }
 
+  // Recarga (solo si hace falta) los datos de la pestaña [index]. Nunca
+  // toca los outfits IA de Inicio — esos se manejan aparte.
+  void _refrescarPestana(int index) {
+    switch (index) {
+      case 0:
+        context.read<RecomendacionController>().refrescarSiHaceFalta();
+        break;
+      case 1:
+        context.read<GuardarropaController>().refrescarSiHaceFalta();
+        break;
+      case 2:
+        context.read<HistorialController>().refrescarSiHaceFalta();
+        break;
+      case 3:
+        context.read<AuthController>().refrescarSiHaceFalta();
+        break;
+    }
+  }
+
+  void _cambiarTab(int index) {
+    setState(() => _tabActual = index);
+    _refrescarPestana(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,20 +108,44 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: GlassBottomNav(
         currentIndex: _tabActual,
-        onTap: (i) => setState(() => _tabActual = i),
+        onTap: _cambiarTab,
       ),
     );
   }
 }
 
 // ── Tab de inicio ──────────────────────────────────────────
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   const _HomeTab();
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  bool _falloYaAvisado = false;
+
+  void _avisarSiFallo(RecomendacionController ctrl) {
+    if (ctrl.ultimoRefrescoFallo && !_falloYaAvisado) {
+      _falloYaAvisado = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sin conexión. Mostrando la última información disponible.'),
+          ),
+        );
+      });
+    } else if (!ctrl.ultimoRefrescoFallo) {
+      _falloYaAvisado = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final authCtrl = context.watch<AuthController>();
     final recCtrl = context.watch<RecomendacionController>();
+    _avisarSiFallo(recCtrl);
     final nombre = authCtrl.usuario?.nombre.split(' ').first ?? 'usuario';
 
     return Scaffold(
@@ -486,10 +549,43 @@ class _HomeTab extends StatelessWidget {
   }
 
   Widget _buildOutfitsDiarios(BuildContext context, RecomendacionController recCtrl) {
-    if (recCtrl.estado == RecomendacionEstado.cargando) {
+    if (recCtrl.estado == RecomendacionEstado.cargando && recCtrl.outfitsDelDia.isEmpty) {
       return const SizedBox(
         height: 200,
         child: LoadingWidget(mensaje: 'Generando outfits del día...'),
+      );
+    }
+
+    if (recCtrl.estado == RecomendacionEstado.error && recCtrl.outfitsDelDia.isEmpty) {
+      return Container(
+        height: 140,
+        decoration: BoxDecoration(
+          color: StyleMeTheme.card,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off, color: StyleMeTheme.textSecondary, size: 28),
+              const SizedBox(height: 8),
+              Text(
+                recCtrl.mensajeError ?? 'No se pudieron cargar los outfits',
+                style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () => recCtrl.cargarOutfitsDiarios(),
+                icon: const Icon(Icons.refresh, size: 16, color: StyleMeTheme.primary),
+                label: Text(
+                  'Reintentar',
+                  style: GoogleFonts.poppins(color: StyleMeTheme.primary, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

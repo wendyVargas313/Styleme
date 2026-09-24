@@ -154,9 +154,17 @@ class _PerfilScreenState extends State<PerfilScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+      body: usuario == null
+          ? (authCtrl.cargandoPerfil
+              ? const Center(child: CircularProgressIndicator(color: StyleMeTheme.primary))
+              : _buildSinUsuario(context, authCtrl))
+          : RefreshIndicator(
+              color: _naranja,
+              onRefresh: () => authCtrl.refrescarPerfil(),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
           children: [
             // Avatar y nombre
             FadeSlideIn(
@@ -187,14 +195,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
                                     height: 80,
                                     errorBuilder: (_, __, ___) => Center(
                                       child: Text(
-                                        usuario?.inicial ?? 'S',
+                                        usuario.inicial,
                                         style: GoogleFonts.poppins(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                   )
                                 : Center(
                                     child: Text(
-                                      usuario?.inicial ?? 'S',
+                                      usuario.inicial,
                                       style: GoogleFonts.poppins(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold),
                                     ),
                                   ),
@@ -240,12 +248,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    usuario?.nombre ?? '',
+                    usuario.nombre,
                     style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    usuario?.email ?? '',
+                    usuario.email,
                     style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 4),
@@ -256,7 +264,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      usuario?.genero ?? 'otro',
+                      usuario.genero,
                       style: GoogleFonts.poppins(color: StyleMeTheme.primary, fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -282,7 +290,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 children: [
                   Expanded(child: _statCard('Prendas', '${guardCtrl.totalPrendas}', Icons.checkroom)),
                   const SizedBox(width: 12),
-                  Expanded(child: _statCard('Outfits', '${usuario?.totalOutfitsGenerados ?? 0}', Icons.auto_awesome)),
+                  Expanded(child: _statCard('Outfits', '${usuario.totalOutfitsGenerados}', Icons.auto_awesome)),
                   const SizedBox(width: 12),
                   Expanded(child: _statCard('Guardados', '${_contarGuardados(histCtrl)}', Icons.bookmark)),
                 ],
@@ -344,8 +352,48 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
             ),
             const SizedBox(height: 24),
-          ],
-        ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildSinUsuario(BuildContext context, AuthController authCtrl) {
+    return RefreshIndicator(
+      color: _naranja,
+      onRefresh: () => authCtrl.refrescarPerfil(),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off, color: StyleMeTheme.textSecondary, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    authCtrl.mensajeErrorPerfil ?? 'No se pudo cargar tu perfil',
+                    style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => authCtrl.refrescarPerfil(),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Reintentar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _naranja,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

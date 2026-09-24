@@ -11,6 +11,7 @@ from typing import List
 
 from app.ml.ml_agent import ml_agent
 from app.ml.recommender import RecomendadorOutfits
+from app.services.imagen_service import normalizar_orientacion
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ async def probar_como_invitado(
         for idx, imagen in enumerate(imagenes):
             logger.info(f"  📷 Imagen [{idx+1}/{len(imagenes)}]: filename={imagen.filename}, content_type={imagen.content_type}")
             contenido = await imagen.read()
+            contenido = normalizar_orientacion(contenido)
             logger.info(f"  📦 Tamaño bytes: {len(contenido)}")
 
             if len(contenido) == 0:

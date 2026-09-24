@@ -15,6 +15,8 @@ class HistorialScreen extends StatefulWidget {
 }
 
 class _HistorialScreenState extends State<HistorialScreen> {
+  bool _falloYaAvisado = false;
+
   @override
   void initState() {
     super.initState();
@@ -23,9 +25,26 @@ class _HistorialScreenState extends State<HistorialScreen> {
     });
   }
 
+  void _avisarSiFallo(HistorialController ctrl) {
+    if (ctrl.ultimoRefrescoFallo && !_falloYaAvisado) {
+      _falloYaAvisado = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sin conexión. Mostrando la última información disponible.'),
+          ),
+        );
+      });
+    } else if (!ctrl.ultimoRefrescoFallo) {
+      _falloYaAvisado = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = context.watch<HistorialController>();
+    _avisarSiFallo(ctrl);
 
     return Scaffold(
       backgroundColor: StyleMeTheme.background,
@@ -98,8 +117,35 @@ class _HistorialScreenState extends State<HistorialScreen> {
   }
 
   Widget _buildLista(HistorialController ctrl) {
-    if (ctrl.estado == HistorialEstado.cargando) {
+    if (ctrl.estado == HistorialEstado.cargando && ctrl.outfits.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: StyleMeTheme.primary));
+    }
+
+    if (ctrl.estado == HistorialEstado.error && ctrl.outfits.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off, color: StyleMeTheme.textSecondary, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              ctrl.mensajeError ?? 'No se pudo cargar el historial',
+              style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => ctrl.cargarHistorial(filtro: ctrl.filtroActivo, resetear: true),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Reintentar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: StyleMeTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     if (ctrl.outfits.isEmpty) {

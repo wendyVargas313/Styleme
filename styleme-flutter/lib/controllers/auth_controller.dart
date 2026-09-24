@@ -1,14 +1,16 @@
 // StyleMe - Controller de Autenticación (Provider)
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/controllers/mixins/recarga_inteligente.dart';
 import 'package:styleme/models/user_model.dart';
 import 'package:styleme/services/auth_service.dart';
 import 'package:styleme/services/storage_service.dart';
 
 enum AuthEstado { inicial, cargando, autenticado, noAutenticado, error }
 
-class AuthController extends ChangeNotifier {
+class AuthController extends ChangeNotifier with RecargaInteligente {
   final AuthService _authService = AuthService();
   final StorageService _storage = StorageService();
 
@@ -16,11 +18,24 @@ class AuthController extends ChangeNotifier {
   UserModel? _usuario;
   String? _mensajeError;
   int? _fotoVersion;
+  String? _mensajeErrorPerfil;
+  // Flag propio para refrescarPerfil, separado de _estado/AuthEstado (que
+  // pertenece al flujo de login/splash y no debe tocarse aquí).
+  bool _cargandoPerfil = false;
 
   AuthEstado get estado => _estado;
   UserModel? get usuario => _usuario;
   String? get mensajeError => _mensajeError;
   bool get estaAutenticado => _estado == AuthEstado.autenticado;
+  String? get mensajeErrorPerfil => _mensajeErrorPerfil;
+  bool get cargandoPerfil => _cargandoPerfil;
+
+  // Recarga el perfil solo si hace falta (nunca cargó, la última falló, o
+  // pasaron más de 30s). Si ya hay una carga en curso, no dispara otra.
+  Future<void> refrescarSiHaceFalta() async {
+    if (_cargandoPerfil) return;
+    if (haceFaltaRecargar) await refrescarPerfil();
+  }
 
   // Verifica si hay sesión guardada al iniciar la app
   Future<void> verificarSesion() async {
@@ -96,10 +111,21 @@ class AuthController extends ChangeNotifier {
 
   // Refrescar perfil del usuario
   Future<void> refrescarPerfil() async {
+    _cargandoPerfil = true;
+    notifyListeners();
+
     try {
       _usuario = await _authService.obtenerPerfil();
+      _mensajeErrorPerfil = null;
+      registrarCargaExitosa();
+    } catch (e) {
+      developer.log('No se pudo refrescar el perfil: $e', name: '[Perfil]');
+      registrarCargaFallida();
+      _mensajeErrorPerfil = 'No se pudo cargar tu perfil';
+    } finally {
+      _cargandoPerfil = false;
       notifyListeners();
-    } catch (_) {}
+    }
   }
 
   // Sube la foto de perfil y actualiza el usuario en memoria

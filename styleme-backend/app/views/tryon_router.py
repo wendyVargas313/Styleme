@@ -1,5 +1,6 @@
 # StyleMe - Router de Virtual Try-On
 import base64
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -10,6 +11,8 @@ from app.controllers.virtual_tryon_controller import (
     generar_tryon_multipart,
     health_virtual_tryon,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tryon", tags=["Virtual Try-On"])
 
@@ -30,6 +33,11 @@ async def tryon(
         prenda_bytes  = base64.b64decode(request_data.imagen_prenda)
     except Exception:
         raise HTTPException(status_code=400, detail="Las imágenes deben ser base64 válido")
+
+    logger.info(
+        f"Try-on solicitado: categoria={request_data.categoria} "
+        f"persona={len(persona_bytes) / 1024:.1f}KB prenda={len(prenda_bytes) / 1024:.1f}KB"
+    )
 
     return await generar_tryon_multipart(
         persona_bytes, prenda_bytes, request_data.categoria, db

@@ -13,6 +13,7 @@ from app.config.settings import settings
 from app.models.user_model import UserModel
 from app.schemas.user_schema import RegistroRequest, LoginRequest
 from app.middleware.auth_middleware import crear_token
+from app.services.imagen_service import normalizar_orientacion
 
 logger = logging.getLogger(__name__)
 
@@ -159,12 +160,37 @@ async def obtener_perfil(usuario: dict, db) -> dict:
     }
 
 
+def _redimensionar_manteniendo_proporcion(imagen_bytes: bytes, lado_maximo: int = 1024) -> bytes:
+    """
+    Redimensiona la imagen para que su lado mayor mida como máximo
+    lado_maximo, SIN recortar ni deformar y sin agrandar imágenes más
+    pequeñas. Se usa para la foto de perfil (que también es la foto de
+    cuerpo completo para el virtual try-on): un recorte cuadrado le
+    cortaría partes del cuerpo.
+
+    Returns:
+        bytes: JPEG RGB calidad 90
+    """
+    img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
+
+    lado_mayor = max(img.width, img.height)
+    if lado_mayor > lado_maximo:
+        escala = lado_maximo / lado_mayor
+        nuevo_ancho = round(img.width * escala)
+        nuevo_alto = round(img.height * escala)
+        img = img.resize((nuevo_ancho, nuevo_alto), Image.LANCZOS)
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
+
+
 async def subir_foto_perfil(usuario: dict, imagen_bytes: bytes, db) -> dict:
     """
     Guarda la foto de perfil del usuario en disco y actualiza MongoDB.
 
     Proceso:
-    1. Convertir imagen a JPEG 512x512
+    1. Redimensionar conservando proporción (lado mayor máx. 1024px)
     2. Guardar en /uploads/{usuario_id}/perfil.jpg (sobreescribe)
     3. Actualizar foto_perfil_url en MongoDB
 
@@ -172,16 +198,10 @@ async def subir_foto_perfil(usuario: dict, imagen_bytes: bytes, db) -> dict:
         dict con ok y foto_perfil_url
     """
     usuario_id = str(usuario["_id"])
+    imagen_bytes = normalizar_orientacion(imagen_bytes)
 
-    # Convertir imagen a JPEG cuadrado 512x512
     try:
-        img = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
-        # Recorte centrado para mantener proporción
-        lado = min(img.width, img.height)
-        left = (img.width - lado) // 2
-        top = (img.height - lado) // 2
-        img = img.crop((left, top, left + lado, top + lado))
-        img = img.resize((512, 512), Image.LANCZOS)
+        imagen_procesada = _redimensionar_manteniendo_proporcion(imagen_bytes)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Imagen no válida: {e}")
 
@@ -189,10 +209,7 @@ async def subir_foto_perfil(usuario: dict, imagen_bytes: bytes, db) -> dict:
     directorio = Path(settings.UPLOADS_PATH) / usuario_id
     directorio.mkdir(parents=True, exist_ok=True)
     ruta = directorio / "perfil.jpg"
-
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=92)
-    ruta.write_bytes(buf.getvalue())
+    ruta.write_bytes(imagen_procesada)
 
     foto_perfil_url = f"/uploads/{usuario_id}/perfil.jpg"
 
@@ -226,6 +243,7 @@ async def subir_avatar(usuario: dict, imagen_bytes: bytes, db) -> dict:
         dict con ok y foto_avatar_url
     """
     usuario_id = str(usuario["_id"])
+    imagen_bytes = normalizar_orientacion(imagen_bytes)
 
     # Convertir imagen a JPEG cuadrado 512x512
     try:

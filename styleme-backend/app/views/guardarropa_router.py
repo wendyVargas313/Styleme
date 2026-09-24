@@ -18,6 +18,9 @@ router = APIRouter(prefix="/guardarropa", tags=["Guardarropa"])
 @router.post("/agregar", status_code=status.HTTP_201_CREATED)
 async def agregar(
     imagen: UploadFile = File(..., description="Imagen JPG/PNG de la prenda (máx 5MB)"),
+    imagen_sin_fondo: Optional[UploadFile] = File(
+        None, description="Recorte PNG con transparencia hecho en el dispositivo (opcional)"
+    ),
     temporada: str = Form(..., description="primavera/verano/otono/invierno"),
     notas: Optional[str] = Form("", description="Notas opcionales sobre la prenda"),
     usuario_actual=Depends(get_usuario_actual),
@@ -39,7 +42,8 @@ async def agregar(
         nombre_imagen=nombre_imagen,
         temporada=temporada,
         notas=notas or "",
-        db=db
+        db=db,
+        imagen_sin_fondo=imagen_sin_fondo
     )
 
 

@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/controllers/mixins/recarga_inteligente.dart';
 import 'package:styleme/models/prenda_model.dart';
 import 'package:styleme/services/api_service.dart';
+import 'package:styleme/services/segmentacion_service.dart';
 
 enum GuardarropaEstado { inicial, cargando, listo, agregando, error }
 
-class GuardarropaController extends ChangeNotifier {
+class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   final ApiService _api = ApiService();
 
   GuardarropaEstado _estado = GuardarropaEstado.inicial;
@@ -17,6 +19,7 @@ class GuardarropaController extends ChangeNotifier {
   String? _mensajeError;
   int _totalPrendas = 0;
   int _paginaActual = 1;
+  bool _ultimoRefrescoFallo = false;
 
   // Filtros activos
   String? _filtroTipo;
@@ -31,14 +34,25 @@ class GuardarropaController extends ChangeNotifier {
   String? get filtroTipo => _filtroTipo;
   String? get filtroColor => _filtroColor;
   String? get filtroTemporada => _filtroTemporada;
+  bool get ultimoRefrescoFallo => _ultimoRefrescoFallo;
+
+  // Recarga solo si hace falta (nunca cargó, la última falló, o pasaron
+  // más de 30s). Pensado para disparadores pasivos: cambio de pestaña,
+  // vuelta a primer plano. Si ya hay una carga en curso, no dispara otra.
+  // Siempre pide resetear:true (página 1) para no arrastrar una página
+  // vieja si en el futuro se agrega scroll infinito.
+  Future<void> refrescarSiHaceFalta() async {
+    if (_estado == GuardarropaEstado.cargando) return;
+    if (haceFaltaRecargar) await cargarPrendas(resetear: true);
+  }
 
   // Cargar prendas del guardarropa
   Future<void> cargarPrendas({bool resetear = false}) async {
     if (resetear) {
       _paginaActual = 1;
-      _prendas = [];
     }
 
+    final huboDatosPrevios = _prendas.isNotEmpty;
     _estado = GuardarropaEstado.cargando;
     _mensajeError = null;
     notifyListeners();
@@ -59,12 +73,24 @@ class GuardarropaController extends ChangeNotifier {
 
       final data = response.data as Map<String, dynamic>;
       final prendasJson = data['prendas'] as List? ?? [];
+      // Solo se reemplaza la lista si la respuesta fue exitosa.
       _prendas = prendasJson.map((p) => PrendaModel.fromJson(p)).toList();
       _totalPrendas = data['total'] ?? 0;
       _estado = GuardarropaEstado.listo;
+      _ultimoRefrescoFallo = false;
+      registrarCargaExitosa();
     } catch (e) {
+      registrarCargaFallida();
       _mensajeError = 'Error cargando prendas';
-      _estado = GuardarropaEstado.error;
+      if (huboDatosPrevios) {
+        // Se conserva la lista previa: no dejamos al usuario sin nada por
+        // un fallo puntual de red.
+        _estado = GuardarropaEstado.listo;
+        _ultimoRefrescoFallo = true;
+      } else {
+        _estado = GuardarropaEstado.error;
+        _ultimoRefrescoFallo = false;
+      }
     }
     notifyListeners();
   }
@@ -80,16 +106,34 @@ class GuardarropaController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final formData = FormData.fromMap({
+      // Recorte de fondo hecho en el celular (ML Kit); imagen sigue siendo
+      // la foto ORIGINAL sin cambios, YOLO la necesita tal cual.
+      final recorte = await SegmentacionService.recortarFondo(imagen);
+
+      final campos = <String, dynamic>{
         'imagen': await MultipartFile.fromFile(
           imagen.path,
           filename: imagen.path.split('/').last,
         ),
         'temporada': temporada,
         'notas': notas,
-      });
+      };
 
-      final response = await _api.postFormData(ApiConfig.agregarPrenda, formData);
+      if (recorte != null) {
+        campos['imagen_sin_fondo'] = await MultipartFile.fromFile(
+          recorte.path,
+          filename: 'recorte.png',
+          contentType: DioMediaType('image', 'png'),
+        );
+      }
+
+      final formData = FormData.fromMap(campos);
+
+      final response = await _api.postFormData(
+        ApiConfig.agregarPrenda,
+        formData,
+        receiveTimeout: const Duration(seconds: 120),
+      );
       final data = response.data as Map<String, dynamic>;
 
       if (data['success'] == true) {

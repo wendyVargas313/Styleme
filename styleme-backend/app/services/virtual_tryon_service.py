@@ -2,15 +2,21 @@
 
 import base64
 import io
+import logging
 import os
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorGridFSBucket
 from PIL import Image
+
+from app.services.imagen_service import normalizar_orientacion
+
+logger = logging.getLogger(__name__)
 
 
 class VirtualTryOnService:
@@ -92,12 +98,21 @@ class VirtualTryOnService:
             "ngrok-skip-browser-warning": "true"
         }
 
+        host = urlparse(self.tryon_url).netloc
+
+        t_inicio = time.perf_counter()
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 self.tryon_url,
                 json=payload,
                 headers=headers
             )
+        duracion_ms = (time.perf_counter() - t_inicio) * 1000
+
+        logger.info(
+            f"Llamada a CatVTON ({host}): status={response.status_code} "
+            f"duracion={duracion_ms:.0f}ms"
+        )
 
         if response.status_code != 200:
             raise RuntimeError(
@@ -127,6 +142,9 @@ class VirtualTryOnService:
         """
         if categoria not in ["upper", "lower", "dresses"]:
             raise ValueError("La categoría debe ser 'upper', 'lower' o 'dresses'")
+
+        persona_bytes = normalizar_orientacion(persona_bytes)
+        prenda_bytes = normalizar_orientacion(prenda_bytes)
 
         start_time = time.time()
 

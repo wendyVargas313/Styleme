@@ -50,20 +50,34 @@ class ApiService {
   }
 
   // ── POST Multipart (para subir imágenes) ──────────────
+  // receiveTimeout es opcional: solo sobreescribe el timeout global
+  // (ApiConfig.receiveTimeout) para esta petición puntual.
   Future<Response> postFormData(
     String url,
-    FormData formData,
-  ) async {
+    FormData formData, {
+    Duration? receiveTimeout,
+  }) async {
     return await _dio.post(
       url,
       data: formData,
-      options: Options(contentType: 'multipart/form-data'),
+      options: Options(
+        contentType: 'multipart/form-data',
+        receiveTimeout: receiveTimeout,
+      ),
     );
   }
 
   // ── DELETE ────────────────────────────────────────────
   Future<Response> delete(String url) async {
     return await _dio.delete(url);
+  }
+
+  // ── GET bytes (para descargar imágenes, ej. foto guardada) ──
+  Future<Response<List<int>>> getBytes(String url) async {
+    return await _dio.get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes),
+    );
   }
 
   // ── Crear FormData para subir imagen ──────────────────
