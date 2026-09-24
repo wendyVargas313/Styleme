@@ -33,7 +33,7 @@ class _GuestScreenState extends State<GuestScreen> {
   }
 
   List<File> _imagenes = [];
-  String _temporadaSeleccionada = 'invierno';
+  String _momentoSeleccionado = AppConstants.momentoDefault;
   bool _procesando = false;
   Map<String, dynamic>? _resultado;
 
@@ -65,11 +65,11 @@ class _GuestScreenState extends State<GuestScreen> {
       final formData = FormData.fromMap({
         'imagenes': files.map((e) => e.value).toList(),
         'device_id': _deviceId,
-        'temporada': _temporadaSeleccionada,
+        'momento': _momentoSeleccionado,
       });
 
       dev.log('[GuestScreen] POST ${ApiConfig.invitadoProbar}');
-      dev.log('[GuestScreen] device_id=$_deviceId | temporada=$_temporadaSeleccionada | imágenes=${_imagenes.length}');
+      dev.log('[GuestScreen] device_id=$_deviceId | momento=$_momentoSeleccionado | imágenes=${_imagenes.length}');
 
       final response = await _api.postFormData(ApiConfig.invitadoProbar, formData);
 
@@ -206,7 +206,7 @@ class _GuestScreenState extends State<GuestScreen> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Temporada',
+          'Momento',
           style: GoogleFonts.poppins(
             color: StyleMeTheme.textSecondary,
             fontSize: 13,
@@ -216,11 +216,11 @@ class _GuestScreenState extends State<GuestScreen> {
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
-          children: AppConstants.temporadas.map((t) {
-            final sel = t == _temporadaSeleccionada;
+          children: AppConstants.momentos.map((m) {
+            final sel = m == _momentoSeleccionado;
             return ChoiceChip(
               label: Text(
-                '${AppConstants.temporadasIconos[t]} $t',
+                '${AppConstants.iconoMomento(m)} ${AppConstants.etiquetaMomento(m)}',
                 style: GoogleFonts.poppins(
                   color: sel ? Colors.white : StyleMeTheme.textSecondary,
                   fontSize: 13,
@@ -229,7 +229,7 @@ class _GuestScreenState extends State<GuestScreen> {
               selected: sel,
               selectedColor: StyleMeTheme.primary,
               backgroundColor: StyleMeTheme.card,
-              onSelected: (_) => setState(() => _temporadaSeleccionada = t),
+              onSelected: (_) => setState(() => _momentoSeleccionado = m),
             );
           }).toList(),
         ),
@@ -454,7 +454,7 @@ class _GuestScreenState extends State<GuestScreen> {
                       fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  '${p['color']} • ${p['temporada']}',
+                  '${p['color']} • ${AppConstants.etiquetaMomento(p['momento'] as String?)}',
                   style: GoogleFonts.poppins(
                       color: StyleMeTheme.textSecondary, fontSize: 12),
                 ),

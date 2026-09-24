@@ -2,20 +2,21 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 
-
-TEMPORADAS_VALIDAS = ["primavera", "verano", "otono", "invierno"]
+from app.models.momento import MOMENTOS_VALIDOS
 
 
 class RecomendarOutfitRequest(BaseModel):
     """Schema para solicitar recomendación de outfit."""
     prenda_id: str = Field(..., description="ID de la prenda base")
-    temporada: str = Field("invierno", description="Temporada para el outfit")
+    momento: Optional[str] = Field(
+        None, description="Momento para limitar candidatos: dia/noche/ambos. None = sin filtrar"
+    )
     top_k: int = Field(3, ge=1, le=5, description="Número de recomendaciones")
 
-    @validator("temporada")
-    def validar_temporada(cls, v):
-        if v not in TEMPORADAS_VALIDAS:
-            raise ValueError(f"Temporada debe ser una de: {TEMPORADAS_VALIDAS}")
+    @validator("momento")
+    def validar_momento(cls, v):
+        if v is not None and v not in MOMENTOS_VALIDOS:
+            raise ValueError(f"Momento debe ser uno de: {MOMENTOS_VALIDOS}")
         return v
 
 
@@ -23,7 +24,7 @@ class DetalleCompatibilidad(BaseModel):
     """Detalle del score de compatibilidad."""
     coocurrencia: float
     color: float
-    temporada: float
+    momento: float
 
 
 class RecomendacionItem(BaseModel):
@@ -47,5 +48,5 @@ class OutfitDiarioResponse(BaseModel):
     """Schema de respuesta para los outfits del día."""
     success: bool
     fecha: str
-    temporada: str
+    momento: Optional[str] = None
     outfits_del_dia: List[dict]

@@ -37,7 +37,7 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen>
     with SingleTickerProviderStateMixin {
   // ── Datos del formulario ────────────────────────────────────
   File? _imagenSeleccionada;
-  String _temporadaSeleccionada = 'invierno';
+  String _momentoSeleccionado = AppConstants.momentoDefault;
   final _notasCtrl = TextEditingController();
 
   // ── Estado de la animación ──────────────────────────────────
@@ -98,7 +98,7 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen>
     final ctrl = context.read<GuardarropaController>();
     final prenda = await ctrl.agregarPrenda(
       imagen: _imagenSeleccionada!,
-      temporada: _temporadaSeleccionada,
+      momento: _momentoSeleccionado,
       notas: _notasCtrl.text.trim(),
     );
 
@@ -207,9 +207,9 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen>
 
           const SizedBox(height: 24),
 
-          // Selector de temporada
+          // Selector de momento
           Text(
-            'Temporada',
+            'Momento',
             style: GoogleFonts.poppins(
               color: StyleMeTheme.textSecondary,
               fontSize: 13,
@@ -218,14 +218,14 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen>
           ),
           const SizedBox(height: 10),
           Row(
-            children: AppConstants.temporadas.map((t) {
-              final sel = t == _temporadaSeleccionada;
+            children: AppConstants.momentos.map((m) {
+              final sel = m == _momentoSeleccionado;
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
                     onTap: () =>
-                        setState(() => _temporadaSeleccionada = t),
+                        setState(() => _momentoSeleccionado = m),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -244,12 +244,12 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen>
                       child: Column(
                         children: [
                           Text(
-                            AppConstants.temporadasIconos[t] ?? '',
+                            AppConstants.iconoMomento(m),
                             style: const TextStyle(fontSize: 20),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            t,
+                            AppConstants.etiquetaMomento(m),
                             style: GoogleFonts.poppins(
                               color: sel
                                   ? Colors.white

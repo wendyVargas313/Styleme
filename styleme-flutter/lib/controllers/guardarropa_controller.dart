@@ -24,7 +24,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   // Filtros activos
   String? _filtroTipo;
   String? _filtroColor;
-  String? _filtroTemporada;
+  String? _filtroMomento;
 
   GuardarropaEstado get estado => _estado;
   List<PrendaModel> get prendas => _prendas;
@@ -33,7 +33,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   int get totalPrendas => _totalPrendas;
   String? get filtroTipo => _filtroTipo;
   String? get filtroColor => _filtroColor;
-  String? get filtroTemporada => _filtroTemporada;
+  String? get filtroMomento => _filtroMomento;
   bool get ultimoRefrescoFallo => _ultimoRefrescoFallo;
 
   // Recarga solo si hace falta (nunca cargó, la última falló, o pasaron
@@ -64,7 +64,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
       };
       if (_filtroTipo != null) queryParams['tipo'] = _filtroTipo;
       if (_filtroColor != null) queryParams['color'] = _filtroColor;
-      if (_filtroTemporada != null) queryParams['temporada'] = _filtroTemporada;
+      if (_filtroMomento != null) queryParams['momento'] = _filtroMomento;
 
       final response = await _api.get(
         ApiConfig.listarPrendas,
@@ -98,7 +98,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   // Agregar prenda con imagen
   Future<PrendaModel?> agregarPrenda({
     required File imagen,
-    required String temporada,
+    required String momento,
     String notas = '',
   }) async {
     _estado = GuardarropaEstado.agregando;
@@ -115,7 +115,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
           imagen.path,
           filename: imagen.path.split('/').last,
         ),
-        'temporada': temporada,
+        'momento': momento,
         'notas': notas,
       };
 
@@ -175,10 +175,10 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   }
 
   // Aplicar filtro
-  void aplicarFiltros({String? tipo, String? color, String? temporada}) {
+  void aplicarFiltros({String? tipo, String? color, String? momento}) {
     _filtroTipo = tipo;
     _filtroColor = color;
-    _filtroTemporada = temporada;
+    _filtroMomento = momento;
     cargarPrendas(resetear: true);
   }
 
@@ -186,7 +186,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   void limpiarFiltros() {
     _filtroTipo = null;
     _filtroColor = null;
-    _filtroTemporada = null;
+    _filtroMomento = null;
     cargarPrendas(resetear: true);
   }
 

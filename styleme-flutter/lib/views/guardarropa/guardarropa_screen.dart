@@ -111,7 +111,7 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: filtros.length,
             itemBuilder: (_, i) {
-              final (label, tipo, color, temporada) = filtros[i];
+              final (label, tipo, color, momento) = filtros[i];
               final activo = tipo == ctrl.filtroTipo && color == ctrl.filtroColor;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -144,16 +144,16 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
             },
           ),
         ),
-        // Filtros por temporada
+        // Filtros por momento
         SizedBox(
           height: 40,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: AppConstants.temporadas.length + 1,
+            itemCount: AppConstants.momentos.length + 1,
             itemBuilder: (_, i) {
               if (i == 0) {
-                final activo = ctrl.filtroTemporada == null;
+                final activo = ctrl.filtroMomento == null;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
@@ -167,20 +167,20 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
                   ),
                 );
               }
-              final t = AppConstants.temporadas[i - 1];
-              final activo = ctrl.filtroTemporada == t;
+              final m = AppConstants.momentos[i - 1];
+              final activo = ctrl.filtroMomento == m;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: FilterChip(
                   label: Text(
-                    '${AppConstants.temporadasIconos[t]} $t',
+                    '${AppConstants.iconoMomento(m)} ${AppConstants.etiquetaMomento(m)}',
                     style: GoogleFonts.poppins(color: activo ? Colors.white : StyleMeTheme.textSecondary, fontSize: 12),
                   ),
                   selected: activo,
                   onSelected: (_) => ctrl.aplicarFiltros(
                     tipo: ctrl.filtroTipo,
                     color: ctrl.filtroColor,
-                    temporada: activo ? null : t,
+                    momento: activo ? null : m,
                   ),
                   backgroundColor: StyleMeTheme.card,
                   selectedColor: StyleMeTheme.primaryDark,

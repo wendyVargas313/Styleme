@@ -2,19 +2,18 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 
-
-TEMPORADAS_VALIDAS = ["primavera", "verano", "otono", "invierno"]
+from app.models.momento import MOMENTOS_VALIDOS, MOMENTO_DEFAULT
 
 
 class AgregarPrendaRequest(BaseModel):
     """Schema para agregar una prenda (datos del form junto a la imagen)."""
-    temporada: str = Field(..., description="Temporada: primavera/verano/otono/invierno")
+    momento: str = Field(MOMENTO_DEFAULT, description="Momento: dia/noche/ambos")
     notas: Optional[str] = Field("", max_length=500, description="Notas opcionales")
 
-    @validator("temporada")
-    def validar_temporada(cls, v):
-        if v not in TEMPORADAS_VALIDAS:
-            raise ValueError(f"Temporada debe ser una de: {TEMPORADAS_VALIDAS}")
+    @validator("momento")
+    def validar_momento(cls, v):
+        if v not in MOMENTOS_VALIDOS:
+            raise ValueError(f"Momento debe ser uno de: {MOMENTOS_VALIDOS}")
         return v
 
 
@@ -23,7 +22,7 @@ class PrendaResponse(BaseModel):
     id: str
     tipo: str
     color: str
-    temporada: str
+    momento: str
     confianza_yolo: float
     imagen_url: str
     notas: str
@@ -44,6 +43,6 @@ class StatsGuardarropaResponse(BaseModel):
     total_prendas: int
     por_tipo: dict
     por_color: dict
-    por_temporada: dict
+    por_momento: dict
     prenda_mas_usada: Optional[dict]
     prendas_nunca_usadas: int

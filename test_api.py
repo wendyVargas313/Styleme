@@ -24,7 +24,7 @@ def test_completo():
             f"{BASE}/guardarropa/agregar",
             headers=h,
             files={"imagen": ("camiseta.jpg", img, "image/jpeg")},
-            data={"temporada": "invierno", "notas": "Prueba ML pipeline"}
+            data={"momento": "noche", "notas": "Prueba ML pipeline"}
         )
 
     prenda = r.json()["prenda"]
@@ -33,26 +33,26 @@ def test_completo():
     print(f"     Tipo detectado (YOLO)  : {prenda['tipo']}")
     print(f"     Color (KMeans)         : {prenda['color']}")
     print(f"     Confianza YOLO         : {prenda['confianza_yolo']:.1%}")
-    print(f"     Temporada              : {prenda['temporada']}")
+    print(f"     Momento                : {prenda['momento']}")
     print(f"     ID                     : {prenda_id}")
 
     # 3. Agregar 2 prendas más para tener variedad
     tipos_extra = [
-        ("test_camiseta.jpg", "primavera"),
-        ("test_camiseta.jpg", "verano"),
+        ("test_camiseta.jpg", "ambos"),
+        ("test_camiseta.jpg", "dia"),
     ]
     ids_extra = []
-    for img_path, temporada in tipos_extra:
+    for img_path, momento in tipos_extra:
         with open(img_path, "rb") as img:
             r2 = requests.post(
                 f"{BASE}/guardarropa/agregar",
                 headers=h,
                 files={"imagen": ("prenda.jpg", img, "image/jpeg")},
-                data={"temporada": temporada}
+                data={"momento": momento}
             )
         p2 = r2.json()["prenda"]
         ids_extra.append(p2["id"])
-        print(f"[OK] Prenda extra: {p2['tipo']} ({p2['color']}) - {temporada}")
+        print(f"[OK] Prenda extra: {p2['tipo']} ({p2['color']}) - {momento}")
 
     # 4. Stats del guardarropa
     r = requests.get(f"{BASE}/guardarropa/stats", headers=h)
@@ -62,11 +62,11 @@ def test_completo():
     print(f"     Por tipo     : {dict(list(stats['por_tipo'].items())[:3])}")
     print(f"     Por color    : {dict(list(stats['por_color'].items())[:3])}")
 
-    # 5. Generar outfit con recomendador (Co-ocurrencia + Color + Temporada)
+    # 5. Generar outfit con recomendador (Co-ocurrencia + Color + Momento)
     r = requests.post(
         f"{BASE}/recomendar/outfit",
         headers=h,
-        json={"prenda_id": prenda_id, "temporada": "invierno", "top_k": 3}
+        json={"prenda_id": prenda_id, "momento": "noche", "top_k": 3}
     )
     outfit = r.json()
     print(f"\n[OK] Outfit generado:")
@@ -93,7 +93,7 @@ def test_completo():
     print(f"[OK] Historial: {hist['total']} outfits guardados")
 
     # 8. Outfits del día
-    r = requests.get(f"{BASE}/recomendar/diario?temporada=invierno", headers=h)
+    r = requests.get(f"{BASE}/recomendar/diario?momento=noche", headers=h)
     diario = r.json()
     print(f"[OK] Outfits del dia: {diario.get('total_outfits', 0)} generados")
 

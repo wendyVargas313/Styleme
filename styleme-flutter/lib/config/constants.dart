@@ -4,20 +4,31 @@ class AppConstants {
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
 
-  // Temporadas disponibles
-  static const List<String> temporadas = [
-    'primavera',
-    'verano',
-    'otono',
-    'invierno',
-  ];
+  // Momentos disponibles para una prenda: cuándo conviene usarla
+  static const List<String> momentos = ['dia', 'noche', 'ambos'];
+  static const String momentoDefault = 'ambos';
 
-  static const Map<String, String> temporadasIconos = {
-    'primavera': '🌸',
-    'verano': '☀️',
-    'otono': '🍂',
-    'invierno': '❄️',
+  static const Map<String, String> momentoIconos = {
+    'dia': '☀️',
+    'noche': '🌙',
+    'ambos': '🔄',
   };
+
+  static const Map<String, String> momentoEtiquetas = {
+    'dia': 'Día · calor',
+    'noche': 'Noche · frío',
+    'ambos': 'Ambos',
+  };
+
+  // Ícono para un momento; tolerante a null o valores desconocidos.
+  static String iconoMomento(String? momento) {
+    return momentoIconos[momento] ?? '🔄';
+  }
+
+  // Etiqueta legible para un momento; tolerante a null o valores desconocidos.
+  static String etiquetaMomento(String? momento) {
+    return momentoEtiquetas[momento] ?? 'Ambos';
+  }
 
   // Opciones de género
   static const List<String> generos = ['masculino', 'femenino', 'otro'];

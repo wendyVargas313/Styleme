@@ -109,7 +109,7 @@ Tres modelos trabajan en secuencia (`ml/ml_agent.py` → `ml_agent.procesar_imag
    - Archivo: `ml/color_classifier.py`
 
 3. **Recomendador por Coocurrencia** (`modelo_recomendador_outfits.pkl`)
-   - Califica compatibilidad de outfits: `puntuación = 0.5×coocurrencia + 0.3×color + 0.2×temporada`
+   - Califica compatibilidad de outfits: `puntuación = 0.5×coocurrencia + 0.3×color + 0.2×momento`
    - Archivo: `ml/recommender.py`
 
 Todos los archivos de modelos están en la **raíz del proyecto** (un nivel arriba de `styleme-backend/`), configurado mediante `ML_MODELS_PATH` en settings.
@@ -138,7 +138,7 @@ Además, `rembg` + `onnxruntime` (modelo u2net) se usan para eliminación de fon
 | Colección | Propósito | Campos Clave |
 |----------|----------|-------------|
 | `users` | Cuentas de usuario | `_id`, `email`, `nombre`, `password_hash`, `genero`, `created_at` |
-| `prendas` | Artículos del guardarropa (ropa) | `_id`, `user_id`, `tipo`, `color`, `temporada`, `imagen_url`, `confidence` |
+| `prendas` | Artículos del guardarropa (ropa) | `_id`, `user_id`, `tipo`, `color`, `momento` (temporada: campo legado, se conserva como respaldo), `imagen_url`, `confidence` |
 | `outfits` | Outfits generados | `_id`, `user_id`, `prenda_base_id`, `complementos[]`, `puntuacion`, `created_at` |
 | `historial` | Historial de outfits + retroalimentación | `_id`, `user_id`, `outfit_id`, `usado`, `feedback`, `timestamp` |
 
@@ -249,7 +249,7 @@ API_VERSION=v1
 
 ### Agregar un Nuevo Algoritmo de Recomendación
 1. Modificar `recommender.py` — la función de puntuación está en el método `recomendar()`
-2. Actual: `puntuación = 0.5×coocurrencia + 0.3×color + 0.2×temporada`
+2. Actual: `puntuación = 0.5×coocurrencia + 0.3×color + 0.2×momento`
 3. Re-entrenar requiere retroalimentación histórica de outfits (ya recolectada en colección `historial`)
 
 ### Pruebas con curl
@@ -268,7 +268,7 @@ TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
 curl -X POST http://localhost:8000/api/v1/guardarropa/agregar \
   -H "Authorization: Bearer $TOKEN" \
   -F "imagen=@ruta/a/imagen.jpg" \
-  -F "temporada=invierno"
+  -F "momento=noche"
 ```
 
 ---

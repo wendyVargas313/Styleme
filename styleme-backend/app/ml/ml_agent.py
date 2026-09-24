@@ -139,36 +139,34 @@ class StyleMeAgent:
         Calcula compatibilidad y retorna top_k recomendaciones de prendas.
         
         Args:
-            prenda_base: Prenda principal con tipo, color, temporada
+            prenda_base: Prenda principal con tipo, color, momento
             guardarropa: Lista de prendas disponibles del usuario
             top_k: Número de recomendaciones
-        
+
         Returns:
-            Lista de dicts con tipo, color, temporada, score, porcentaje, detalle
+            Lista de dicts con tipo, color, momento, score, porcentaje, detalle
         """
         return self.recomendador.recomendar(prenda_base, guardarropa, top_k)
 
     async def generar_outfit_diario(
         self,
         guardarropa: list,
-        temporada: str = "invierno",
         disliked_ids: Optional[list] = None
     ) -> list:
         """
         Genera 3 outfits completos del día.
         Selecciona prendas base priorizando las menos usadas.
-        
+
         Args:
-            guardarropa: Lista de todas las prendas del usuario
-            temporada: Temporada actual
+            guardarropa: Lista de todas las prendas del usuario (ya filtradas
+                por momento si aplica)
             disliked_ids: IDs de prendas no deseadas
-        
+
         Returns:
             Lista de 3 outfits con prenda_base y complementos
         """
         return self.recomendador.generar_outfit_diario(
             guardarropa,
-            temporada=temporada,
             n_outfits=3,
             disliked_ids=disliked_ids
         )

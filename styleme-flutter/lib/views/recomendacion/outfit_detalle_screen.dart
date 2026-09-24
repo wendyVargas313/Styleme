@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/historial_controller.dart';
 import 'package:styleme/models/feedback_model.dart';
@@ -39,7 +40,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
           prendaBase: _outfit.prendaBase,
           complementos: _outfit.complementos,
           feedback: tipo,
-          temporada: _outfit.temporada,
+          momento: _outfit.momento,
           tipoGeneracion: _outfit.tipoGeneracion,
           generadoEn: _outfit.generadoEn,
         );
@@ -183,7 +184,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
                   const SizedBox(height: 4),
                   _infoChip(prenda.color, Icons.palette),
                   const SizedBox(height: 4),
-                  _infoChip(prenda.temporada, Icons.wb_sunny_outlined),
+                  _infoChip(AppConstants.etiquetaMomento(prenda.momento), Icons.wb_sunny_outlined),
                   const SizedBox(height: 4),
                   _infoChip('Confianza: ${prenda.confianzaTexto}', Icons.psychology),
                 ],
@@ -240,7 +241,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(comp.prenda.tipo, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text('${comp.prenda.color} • ${comp.prenda.temporada}',
+                    Text('${comp.prenda.color} • ${AppConstants.etiquetaMomento(comp.prenda.momento)}',
                         style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12)),
                   ],
                 ),
@@ -268,7 +269,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
         children: [
           _scoreItem('Co-ocurrencia', detalle['coocurrencia'] ?? 0, 'x0.5'),
           _scoreItem('Color', detalle['color'] ?? 0, 'x0.3'),
-          _scoreItem('Temporada', detalle['temporada'] ?? 0, 'x0.2'),
+          _scoreItem('Día/noche', detalle['momento'] ?? detalle['temporada'] ?? 0, 'x0.2'),
         ].map((w) => Expanded(child: w)).toList(),
       ),
     );

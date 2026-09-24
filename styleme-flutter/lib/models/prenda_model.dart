@@ -3,7 +3,7 @@ class PrendaModel {
   final String id;
   final String tipo;
   final String color;
-  final String temporada;
+  final String momento;
   final double confianzaYolo;
   final String imagenUrl;
   final String notas;
@@ -15,7 +15,7 @@ class PrendaModel {
     required this.id,
     required this.tipo,
     required this.color,
-    required this.temporada,
+    required this.momento,
     required this.confianzaYolo,
     required this.imagenUrl,
     this.notas = '',
@@ -29,7 +29,7 @@ class PrendaModel {
       id: json['id']?.toString() ?? '',
       tipo: json['tipo'] ?? '',
       color: json['color'] ?? '',
-      temporada: json['temporada'] ?? '',
+      momento: json['momento'] ?? 'ambos',
       confianzaYolo: (json['confianza_yolo'] ?? 0.0).toDouble(),
       imagenUrl: json['imagen_url'] ?? '',
       notas: json['notas'] ?? '',
@@ -43,7 +43,7 @@ class PrendaModel {
         'id': id,
         'tipo': tipo,
         'color': color,
-        'temporada': temporada,
+        'momento': momento,
         'confianza_yolo': confianzaYolo,
         'imagen_url': imagenUrl,
         'notas': notas,

@@ -2,12 +2,14 @@
 import logging
 from datetime import datetime, date
 from pathlib import Path
+from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 
 from app.config.settings import settings
 from app.models.prenda_model import PrendaModel
 from app.models.outfit_model import OutfitModel
+from app.models.momento import MOMENTO_DEFAULT
 from app.ml.ml_agent import ml_agent
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ def _tipo_a_categoria(tipo: str) -> str:
 
 async def recomendar_outfit(
     prenda_id: str,
-    temporada: str,
+    momento: Optional[str],
     top_k: int,
     usuario_id: str,
     db
@@ -71,18 +73,27 @@ async def recomendar_outfit(
             detail="Necesitas al menos 2 prendas en tu guardarropa para generar outfits"
         )
 
-    # Preparar prenda base para el agente ML
+    # Preparar prenda base para el agente ML — se usa el momento real de la
+    # prenda, no el filtro de la request (ese solo acota los candidatos)
     prenda_base_ml = {
         "tipo": prenda_base["tipo"],
         "color": prenda_base["color"],
-        "temporada": temporada or prenda_base["temporada"],
+        "momento": prenda_base["momento"],
         "id": prenda_base["id"]
     }
+
+    # Si se pidió un momento, limitar los candidatos a ese momento o "ambos"
+    candidatos = guardarropa
+    if momento:
+        candidatos = [
+            p for p in guardarropa
+            if p.get("momento") == momento or p.get("momento") == MOMENTO_DEFAULT
+        ]
 
     # Obtener recomendaciones del agente ML
     recomendaciones_raw = await ml_agent.recomendar_outfit(
         prenda_base_ml,
-        guardarropa,
+        candidatos,
         top_k=top_k
     )
 
@@ -95,7 +106,7 @@ async def recomendar_outfit(
             "id": rec.get("id", ""),
             "tipo": rec.get("tipo", ""),
             "color": rec.get("color", ""),
-            "temporada": rec.get("temporada", ""),
+            "momento": rec.get("momento", ""),
             "confianza_yolo": rec.get("confianza_yolo", 0.0),
             "imagen_url": rec.get("imagen_url", ""),
             "notas": rec.get("notas", ""),
@@ -122,7 +133,7 @@ async def recomendar_outfit(
         usuario_id=usuario_id,
         prenda_base_id=prenda_id,
         complementos=complementos_para_db,
-        temporada=temporada,
+        momento=momento,
         tipo_generacion="manual"
     )
 
@@ -159,16 +170,16 @@ async def recomendar_outfit(
 
 
 async def obtener_outfits_diarios(
-    temporada: str,
+    momento: Optional[str],
     usuario_id: str,
     db
 ) -> dict:
     """
     Genera los outfits del día para el usuario.
     Selecciona 3 prendas base distintas priorizando las menos usadas.
-    
+
     Returns:
-        dict con fecha, temporada y 3 outfits del día
+        dict con fecha, momento y 3 outfits del día
     """
     # Cargar guardarropa completo
     cursor = db.prendas.find({
@@ -182,9 +193,17 @@ async def obtener_outfits_diarios(
         return {
             "success": True,
             "fecha": date.today().isoformat(),
-            "temporada": temporada,
+            "momento": momento,
             "outfits_del_dia": []
         }
+
+    # Si se pidió un momento, limitar los candidatos (base + complementos)
+    # a prendas de ese momento o "ambos"
+    if momento:
+        guardarropa = [
+            p for p in guardarropa
+            if p.get("momento") == momento or p.get("momento") == MOMENTO_DEFAULT
+        ]
 
     # Obtener IDs de outfits con dislike para evitarlos
     disliked_cursor = db.outfits.find({
@@ -200,7 +219,6 @@ async def obtener_outfits_diarios(
     # Generar outfits con el agente ML
     outfits_raw = await ml_agent.generar_outfit_diario(
         guardarropa,
-        temporada=temporada,
         disliked_ids=disliked_prenda_ids
     )
 
@@ -219,7 +237,7 @@ async def obtener_outfits_diarios(
                     "id": comp.get("id", ""),
                     "tipo": comp.get("tipo", ""),
                     "color": comp.get("color", ""),
-                    "temporada": comp.get("temporada", ""),
+                    "momento": comp.get("momento", ""),
                     "imagen_url": comp.get("imagen_url", ""),
                     "confianza_yolo": comp.get("confianza_yolo", 0.0)
                 },
@@ -240,7 +258,7 @@ async def obtener_outfits_diarios(
             usuario_id=usuario_id,
             prenda_base_id=prenda_base.get("id", ""),
             complementos=complementos_para_db,
-            temporada=temporada,
+            momento=momento,
             tipo_generacion="diario"
         )
 
@@ -265,13 +283,13 @@ async def obtener_outfits_diarios(
     return {
         "success": True,
         "fecha": date.today().isoformat(),
-        "temporada": temporada,
+        "momento": momento,
         "total_outfits": len(outfits_del_dia),
         "outfits_del_dia": outfits_del_dia
     }
 
 
-async def generar_outfits_ia(usuario: dict, temporada: str, db) -> dict:
+async def generar_outfits_ia(usuario: dict, momento: Optional[str], db) -> dict:
     """
     Genera outfits del día con imagen IA del usuario usando CatVTON.
 
@@ -306,7 +324,7 @@ async def generar_outfits_ia(usuario: dict, temporada: str, db) -> dict:
     usuario_id = str(usuario["_id"])
 
     # 3. Obtener outfits del día del recomendador
-    diarios = await obtener_outfits_diarios(temporada, usuario_id, db)
+    diarios = await obtener_outfits_diarios(momento, usuario_id, db)
     outfits = diarios.get("outfits_del_dia", [])
 
     if not outfits:

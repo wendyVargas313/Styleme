@@ -27,7 +27,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _tabActual = 0;
-  final String _temporada = 'invierno';
 
   final List<Widget> _pantallas = [
     const _HomeTab(),
@@ -68,11 +67,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final guarCtrl = context.read<GuardarropaController>();
     // Cargar outfits KNN y guardarropa en paralelo
     await Future.wait([
-      recCtrl.cargarOutfitsDiarios(temporada: _temporada),
+      recCtrl.cargarOutfitsDiarios(),
       guarCtrl.cargarPrendas(resetear: true),
     ]);
     // Lanzar generación IA (lenta) sin bloquear la UI
-    recCtrl.cargarOutfitsIA(temporada: _temporada);
+    recCtrl.cargarOutfitsIA();
   }
 
   // Recarga (solo si hace falta) los datos de la pestaña [index]. Nunca

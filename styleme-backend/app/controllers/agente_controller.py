@@ -5,6 +5,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 
 from app.models.outfit_model import OutfitModel
+from app.models.momento import momento_de_prenda, MOMENTO_DEFAULT
 from app.services import clima_service, groq_service, prompt_agente
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ async def recomendar_para_evento(
     # Guardarropa del usuario: query directa, no la paginada de guardarropa_controller
     cursor = db.prendas.find(
         {"usuario_id": ObjectId(usuario_id), "activa": True},
-        {"_id": 1, "tipo": 1, "color": 1, "temporada": 1, "veces_usado": 1, "imagen_url": 1},
+        {"_id": 1, "tipo": 1, "color": 1, "momento": 1, "temporada": 1, "veces_usado": 1, "imagen_url": 1},
     )
     prendas = await cursor.to_list(length=None)
 
@@ -80,7 +81,7 @@ async def recomendar_para_evento(
 
     clima = await clima_service.obtener_clima(lugar, fecha)
 
-    prendas_filtradas = prompt_agente.filtrar_prendas(prendas, clima["temp_promedio"])
+    prendas_filtradas = prompt_agente.filtrar_prendas(prendas, clima)
 
     mensajes = [
         {"role": "system", "content": prompt_agente.SYSTEM_PROMPT},
@@ -296,15 +297,15 @@ async def alternar_guardado_outfit(
             for p in prendas[1:]
         ]
 
-        # Misma "temporada" que ve el usuario en su guardarropa: la de la prenda base.
+        # Mismo "momento" que ve el usuario en su guardarropa: el de la prenda base.
         prenda_base_doc = await db.prendas.find_one({"_id": ObjectId(prenda_base_id)})
-        temporada = prenda_base_doc.get("temporada", "") if prenda_base_doc else ""
+        momento = momento_de_prenda(prenda_base_doc) if prenda_base_doc else MOMENTO_DEFAULT
 
         nuevo_outfit = OutfitModel.crear(
             usuario_id=usuario_id,
             prenda_base_id=prenda_base_id,
             complementos=complementos,
-            temporada=temporada,
+            momento=momento,
             tipo_generacion="evento",
         )
         nuevo_outfit["feedback"] = "liked"

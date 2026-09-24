@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:styleme/app/routes.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
 import 'package:styleme/models/prenda_model.dart';
@@ -110,7 +111,11 @@ class DetallePrendaScreen extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     _chip(prenda.color, Icons.palette, StyleMeTheme.primary),
-                    _chip(_temporadaConEmoji(prenda.temporada), Icons.wb_sunny_outlined, StyleMeTheme.accent),
+                    _chip(
+                      '${AppConstants.iconoMomento(prenda.momento)} ${AppConstants.etiquetaMomento(prenda.momento)}',
+                      Icons.wb_sunny_outlined,
+                      StyleMeTheme.accent,
+                    ),
                     _chip('${prenda.vecesUsado} uso${prenda.vecesUsado != 1 ? 's' : ''}', Icons.replay, StyleMeTheme.textSecondary),
                   ],
                 ),
@@ -121,7 +126,7 @@ class DetallePrendaScreen extends StatelessWidget {
                   ('Tipo detectado', prenda.tipo),
                   ('Color predominante', prenda.color),
                   ('Confianza ML', prenda.confianzaTexto),
-                  ('Temporada', prenda.temporada),
+                  ('Momento', AppConstants.etiquetaMomento(prenda.momento)),
                   ('Agregada', _formatearFecha(prenda.creadoEn)),
                 ]),
 
@@ -276,11 +281,6 @@ class DetallePrendaScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _temporadaConEmoji(String t) {
-    const e = {'primavera': '🌸 primavera', 'verano': '☀️ verano', 'otono': '🍂 otoño', 'invierno': '❄️ invierno'};
-    return e[t] ?? t;
   }
 
   String _formatearFecha(String fecha) {

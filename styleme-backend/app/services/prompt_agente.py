@@ -7,6 +7,21 @@ verificados contra la API real de Groq. No modificar ese texto sin volver
 a correr la verificación.
 """
 
+from app.models.momento import momento_de_prenda
+
+# Umbrales para decidir qué momentos ("dia"/"noche"/"ambos") son apropiados
+# según el clima esperado del evento (ver filtrar_prendas).
+UMBRAL_CALOR_MAX = 22   # temp_max >= esto -> permite "dia"
+UMBRAL_FRIO_MAX = 16    # temp_max <= esto -> permite "noche"
+UMBRAL_LLUVIA_MM = 1.0
+UMBRAL_DIAS_LLUVIA_PCT = 50
+PALABRAS_LLUVIA = ("lluvia", "llovizna", "tormenta", "chubasco", "aguacero")
+
+LEYENDA_MOMENTO = (
+    "momento: dia = ropa fresca para calor, noche = ropa abrigada para frio "
+    "o lluvia, ambos = sirve en los dos casos"
+)
+
 SYSTEM_PROMPT = """Eres un asesor de vestuario. Recomiendas outfits usando UNICAMENTE las
 prendas del guardarropa que se te entrega.
 
@@ -47,7 +62,7 @@ def construir_mensaje_usuario(descripcion_evento: str, clima: dict, prendas: lis
     marca = " (derivado)" if clima["fuente"] == "climatologia" else ""
     expresion = EXPRESION_POR_CONFIANZA.get(clima["confianza"], "la proyeccion indica")
     lineas = "\n".join(
-        f"{i} {p['tipo']} {p['color']} {p['temporada']}" for i, p in enumerate(prendas)
+        f"{i} {p['tipo']} {p['color']} {momento_de_prenda(p)}" for i, p in enumerate(prendas)
     )
     return f"""EVENTO: {descripcion_evento}
 LUGAR: {clima["lugar"]}
@@ -59,31 +74,58 @@ Usa la expresion: "{expresion}"
 humedad {clima["humedad"]}%, lluvia {clima["precipitacion_mm"]}mm, dias con lluvia {clima["dias_con_lluvia_pct"]}%
 {clima["descripcion"]}
 
+{LEYENDA_MOMENTO}
 GUARDARROPA
 {lineas}"""
 
 
-def filtrar_prendas(prendas: list[dict], temp_promedio: float, limite: int = 40) -> list[dict]:
+def _momentos_permitidos(clima: dict) -> set[str] | None:
+    """
+    Decide qué momentos ("dia"/"noche"/"ambos") son apropiados para el clima
+    esperado del evento. Devuelve None si no hay que filtrar por momento
+    (clima intermedio y sin señales de lluvia).
+    """
+    temp_max = clima.get("temp_max")
+    precipitacion_mm = clima.get("precipitacion_mm") or 0
+    dias_con_lluvia_pct = clima.get("dias_con_lluvia_pct") or 0
+    descripcion = (clima.get("descripcion") or "").lower()
+
+    hay_lluvia = (
+        precipitacion_mm >= UMBRAL_LLUVIA_MM
+        or dias_con_lluvia_pct >= UMBRAL_DIAS_LLUVIA_PCT
+        or any(palabra in descripcion for palabra in PALABRAS_LLUVIA)
+    )
+
+    if hay_lluvia:
+        return {"noche", "ambos"}
+    if temp_max is not None and temp_max >= UMBRAL_CALOR_MAX:
+        return {"dia", "ambos"}
+    if temp_max is not None and temp_max <= UMBRAL_FRIO_MAX:
+        return {"noche", "ambos"}
+    return None
+
+
+def filtrar_prendas(prendas: list[dict], clima: dict, limite: int = 40) -> list[dict]:
     """
     Reduce el guardarropa a las prendas más relevantes para el clima, capado a `limite`.
 
-    Si temp_promedio >= 24 descarta las de temporada "invierno"; si es <= 15
-    descarta las de "verano"; en el rango intermedio no descarta por
-    temporada. Las de "todo_el_año" nunca se descartan. El resultado se
-    ordena por veces_usado descendente y se capa a `limite`.
+    El clima decide qué momentos ("dia"/"noche"/"ambos") son apropiados (ver
+    _momentos_permitidos): lluvia -> noche/ambos; calor sin lluvia -> dia/ambos;
+    frío sin lluvia -> noche/ambos; clima intermedio y seco -> no se filtra.
+    El resultado se ordena por veces_usado descendente y se capa a `limite`.
 
-    Si el filtro por temporada deja menos de 3 prendas, se descarta el
-    filtro y se devuelve la lista original ordenada y capada: es preferible
-    recomendar con prendas de temporada inadecuada que no poder recomendar
-    (por ejemplo, un guardarropa pequeño compuesto solo de ropa de invierno
+    Si el filtro por momento deja menos de 3 prendas, se descarta el filtro
+    y se devuelve la lista original ordenada y capada: es preferible
+    recomendar con prendas de momento inadecuado que no poder recomendar
+    (por ejemplo, un guardarropa pequeño compuesto solo de ropa de noche
     en un evento de clima cálido no debe vaciarse a cero opciones).
     """
-    if temp_promedio >= 24:
-        filtradas = [p for p in prendas if p["temporada"] != "invierno"]
-    elif temp_promedio <= 15:
-        filtradas = [p for p in prendas if p["temporada"] != "verano"]
-    else:
+    momentos_permitidos = _momentos_permitidos(clima)
+
+    if momentos_permitidos is None:
         filtradas = list(prendas)
+    else:
+        filtradas = [p for p in prendas if momento_de_prenda(p) in momentos_permitidos]
 
     if len(filtradas) < 3:
         filtradas = list(prendas)

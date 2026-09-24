@@ -29,7 +29,7 @@ class OutfitModel {
   final PrendaModel? prendaBase;
   final List<ComplementoOutfit> complementos;
   final String feedback;
-  final String temporada;
+  final String? momento;
   final String tipoGeneracion;
   final String generadoEn;
 
@@ -38,7 +38,7 @@ class OutfitModel {
     this.prendaBase,
     required this.complementos,
     this.feedback = 'none',
-    required this.temporada,
+    this.momento,
     required this.tipoGeneracion,
     required this.generadoEn,
   });
@@ -56,7 +56,7 @@ class OutfitModel {
           : null,
       complementos: complementos,
       feedback: json['feedback'] ?? 'none',
-      temporada: json['temporada'] ?? '',
+      momento: json['momento'] as String?,
       tipoGeneracion: json['tipo_generacion'] ?? 'manual',
       generadoEn: json['generado_en'] ?? '',
     );

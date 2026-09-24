@@ -16,6 +16,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.config.database import get_db
 from app.config.settings import settings
 from app.models.prenda_model import PrendaModel
+from app.models.momento import MOMENTOS_VALIDOS, MAPEO_TEMPORADA_A_MOMENTO, MOMENTO_DEFAULT, momento_de_prenda
 from app.ml.ml_agent import ml_agent, ml_lock
 from app.services.imagen_service import normalizar_orientacion
 
@@ -212,7 +213,7 @@ async def agregar_prenda(
     usuario_id: str,
     imagen_bytes: bytes,
     nombre_imagen: str,
-    temporada: str,
+    momento: str,
     notas: str,
     db,
     imagen_sin_fondo: Optional[UploadFile] = None
@@ -230,6 +231,12 @@ async def agregar_prenda(
     Returns:
         dict con éxito y datos de la prenda detectada
     """
+    if momento not in MOMENTOS_VALIDOS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
+        )
+
     # Procesar imagen con ML — siempre sobre la foto original
     logger.info(f"🔍 Procesando imagen con ML para usuario {usuario_id}")
     resultado_ml = await ml_agent.procesar_imagen(imagen_bytes)
@@ -284,7 +291,7 @@ async def agregar_prenda(
         usuario_id=usuario_id,
         tipo=tipo,
         color=color,
-        temporada=temporada,
+        momento=momento,
         confianza_yolo=confianza,
         imagen_url=imagen_url,
         notas=notas
@@ -302,7 +309,7 @@ async def agregar_prenda(
             "id": prenda_id,
             "tipo": tipo,
             "color": color,
-            "temporada": temporada,
+            "momento": momento,
             "confianza_yolo": confianza,
             "imagen_url": imagen_url,
             "notas": notas,
@@ -315,14 +322,14 @@ async def listar_prendas(
     usuario_id: str,
     tipo: str = None,
     color: str = None,
-    temporada: str = None,
+    momento: str = None,
     page: int = 1,
     limit: int = 20,
     db=None
 ) -> dict:
     """
     Lista las prendas del guardarropa con filtros opcionales y paginación.
-    
+
     Returns:
         dict con total, página actual y lista de prendas
     """
@@ -336,8 +343,27 @@ async def listar_prendas(
         filtro["tipo"] = tipo
     if color:
         filtro["color"] = color
-    if temporada:
-        filtro["temporada"] = temporada
+    if momento:
+        if momento not in MOMENTOS_VALIDOS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
+            )
+        # Prendas ya migradas: coincidencia directa por "momento".
+        # Prendas sin migrar (solo tienen "temporada"): se incluyen si su
+        # temporada mapea al momento pedido (MAPEO_TEMPORADA_A_MOMENTO).
+        temporadas_legacy = [
+            t for t, m in MAPEO_TEMPORADA_A_MOMENTO.items() if m == momento
+        ]
+        or_clauses = [
+            {"momento": momento},
+            {"momento": {"$exists": False}, "temporada": {"$in": temporadas_legacy}}
+        ]
+        # Prendas sin "momento" ni "temporada" (dato incompleto): caen al
+        # default, así que solo aparecen cuando se filtra por MOMENTO_DEFAULT.
+        if momento == MOMENTO_DEFAULT:
+            or_clauses.append({"momento": {"$exists": False}, "temporada": {"$exists": False}})
+        filtro["$or"] = or_clauses
 
     # Limitar el máximo de prendas por página
     limit = min(limit, 50)
@@ -412,7 +438,7 @@ async def obtener_stats(usuario_id: str, db) -> dict:
             "total_prendas": 0,
             "por_tipo": {},
             "por_color": {},
-            "por_temporada": {},
+            "por_momento": {},
             "prenda_mas_usada": None,
             "prendas_nunca_usadas": 0
         }
@@ -424,7 +450,7 @@ async def obtener_stats(usuario_id: str, db) -> dict:
     # Agrupar por tipo
     por_tipo = {}
     por_color = {}
-    por_temporada = {}
+    por_momento = {}
     prenda_mas_usada = None
     max_usos = -1
     nunca_usadas = 0
@@ -438,10 +464,9 @@ async def obtener_stats(usuario_id: str, db) -> dict:
         color = p.get("color", "negro")
         por_color[color] = por_color.get(color, 0) + 1
 
-        # Por temporada
-        temporada = p.get("temporada", "")
-        if temporada:
-            por_temporada[temporada] = por_temporada.get(temporada, 0) + 1
+        # Por momento
+        momento = momento_de_prenda(p)
+        por_momento[momento] = por_momento.get(momento, 0) + 1
 
         # Prenda más usada
         usos = p.get("veces_usado", 0)
@@ -457,7 +482,7 @@ async def obtener_stats(usuario_id: str, db) -> dict:
         "total_prendas": total,
         "por_tipo": por_tipo,
         "por_color": por_color,
-        "por_temporada": por_temporada,
+        "por_momento": por_momento,
         "prenda_mas_usada": prenda_mas_usada if max_usos > 0 else None,
         "prendas_nunca_usadas": nunca_usadas
     }

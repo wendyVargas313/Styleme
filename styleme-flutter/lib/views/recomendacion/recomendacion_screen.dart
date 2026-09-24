@@ -24,7 +24,8 @@ class RecomendacionScreen extends StatefulWidget {
 
 class _RecomendacionScreenState extends State<RecomendacionScreen> {
   PrendaModel? _prendaSeleccionada;
-  String _temporadaSeleccionada = 'invierno';
+  // null = "Cualquiera": no se envía filtro de momento al backend.
+  String? _momentoSeleccionado;
 
   @override
   void initState() {
@@ -49,7 +50,7 @@ class _RecomendacionScreenState extends State<RecomendacionScreen> {
     final recCtrl = context.read<RecomendacionController>();
     await recCtrl.generarOutfit(
       prendaId: _prendaSeleccionada!.id,
-      temporada: _temporadaSeleccionada,
+      momento: _momentoSeleccionado,
     );
   }
 
@@ -94,20 +95,22 @@ class _RecomendacionScreenState extends State<RecomendacionScreen> {
 
               const SizedBox(height: 24),
 
-              // Selector de temporada
+              // Selector de momento (null = "Cualquiera": no filtra)
               Text(
-                'Temporada',
+                'Momento',
                 style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 10),
               Row(
-                children: AppConstants.temporadas.map((t) {
-                  final sel = t == _temporadaSeleccionada;
+                children: <String?>[null, 'dia', 'noche'].map((m) {
+                  final sel = m == _momentoSeleccionado;
+                  final icono = m == null ? '🔀' : AppConstants.iconoMomento(m);
+                  final etiqueta = m == null ? 'Cualquiera' : AppConstants.etiquetaMomento(m);
                   return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
-                        onTap: () => setState(() => _temporadaSeleccionada = t),
+                        onTap: () => setState(() => _momentoSeleccionado = m),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -117,9 +120,9 @@ class _RecomendacionScreenState extends State<RecomendacionScreen> {
                           ),
                           child: Column(
                             children: [
-                              Text(AppConstants.temporadasIconos[t] ?? '', style: const TextStyle(fontSize: 18)),
+                              Text(icono, style: const TextStyle(fontSize: 18)),
                               const SizedBox(height: 2),
-                              Text(t, style: GoogleFonts.poppins(
+                              Text(etiqueta, style: GoogleFonts.poppins(
                                 color: sel ? Colors.white : StyleMeTheme.textSecondary,
                                 fontSize: 9,
                                 fontWeight: sel ? FontWeight.w600 : FontWeight.normal,

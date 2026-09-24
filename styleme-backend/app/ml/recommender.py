@@ -5,6 +5,8 @@ import random
 from pathlib import Path
 from typing import List, Optional
 
+from app.models.momento import momento_de_prenda
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,8 +15,8 @@ class RecomendadorOutfits:
     Wrapper del modelo de scoring basado en co-ocurrencia real.
     Modelo: modelo_recomendador_outfits.pkl
     Dataset: 316 pares reales de 2,909 imágenes del dataset
-    
-    Fórmula: score = 0.5×coocurrencia + 0.3×color + 0.2×temporada
+
+    Fórmula: score = 0.5×coocurrencia + 0.3×color + 0.2×momento
     Score compatibles: 0.707 | Score no compatibles: 0.208
     Separación: +0.499
     """
@@ -53,18 +55,15 @@ class RecomendadorOutfits:
                 return grupo
         return "otro"
 
-    def _score_temporada(self, t1: str, t2: str) -> float:
-        """Calcula compatibilidad entre dos temporadas."""
-        if t1 == t2:
+    def _score_momento(self, m1: str, m2: str) -> float:
+        """
+        Calcula compatibilidad entre dos momentos.
+        1.0 si son iguales o si alguno de los dos es "ambos" (versátil,
+        compatible con cualquier otro); 0.0 si uno es "dia" y el otro "noche".
+        """
+        if m1 == m2 or m1 == "ambos" or m2 == "ambos":
             return 1.0
-
-        adyacentes = {
-            ("primavera", "verano"), ("verano", "otono"),
-            ("otono", "invierno"), ("invierno", "primavera"),
-            ("verano", "primavera"), ("otono", "verano"),
-            ("invierno", "otono"), ("primavera", "invierno"),
-        }
-        return 0.5 if (t1, t2) in adyacentes else 0.2
+        return 0.0
 
     def recomendar(
         self,
@@ -76,10 +75,10 @@ class RecomendadorOutfits:
         Recomienda prendas compatibles del guardarropa.
         
         Args:
-            prenda_base: Prenda base con tipo, color, temporada
+            prenda_base: Prenda base con tipo, color, momento
             guardarropa: Lista de prendas del usuario
             top_k: Número máximo de recomendaciones
-        
+
         Returns:
             Lista de prendas con scores ordenadas de mayor a menor
         """
@@ -88,7 +87,7 @@ class RecomendadorOutfits:
 
         tipo_a = prenda_base.get("tipo", "")
         color_a = prenda_base.get("color", "")
-        temp_a = prenda_base.get("temporada", "invierno")
+        momento_a = momento_de_prenda(prenda_base)
         grupo_a = self.get_grupo(tipo_a)
 
         # Convertir la matriz de compatibilidad a tuplas
@@ -115,7 +114,7 @@ class RecomendadorOutfits:
 
             tipo_b = prenda.get("tipo", "")
             color_b = prenda.get("color", "")
-            temp_b = prenda.get("temporada", "invierno")
+            momento_b = momento_de_prenda(prenda)
 
             # Calcular score de co-ocurrencia
             par = tuple(sorted([tipo_a, tipo_b]))
@@ -125,11 +124,11 @@ class RecomendadorOutfits:
             colores_compat = compat_col.get(color_a, set())
             sc_color = 1.0 if color_b in colores_compat else 0.3
 
-            # Calcular score de temporada
-            sc_temp = self._score_temporada(temp_a, temp_b)
+            # Calcular score de momento
+            sc_momento = self._score_momento(momento_a, momento_b)
 
             # Score final ponderado
-            score_final = (0.5 * sc_cooc) + (0.3 * sc_color) + (0.2 * sc_temp)
+            score_final = (0.5 * sc_cooc) + (0.3 * sc_color) + (0.2 * sc_momento)
 
             scores.append({
                 **prenda,
@@ -138,7 +137,7 @@ class RecomendadorOutfits:
                 "detalle": {
                     "coocurrencia": round(sc_cooc, 4),
                     "color": round(sc_color, 4),
-                    "temporada": round(sc_temp, 4)
+                    "momento": round(sc_momento, 4)
                 }
             })
 
@@ -149,19 +148,18 @@ class RecomendadorOutfits:
     def generar_outfit_diario(
         self,
         guardarropa: list,
-        temporada: str = "invierno",
         n_outfits: int = 3,
         disliked_ids: Optional[list] = None
     ) -> list:
         """
         Genera N outfits completos priorizando prendas menos usadas.
-        
+
         Args:
-            guardarropa: Lista de todas las prendas del usuario
-            temporada: Temporada actual
+            guardarropa: Lista de todas las prendas del usuario (ya filtradas
+                por momento si aplica — este método no filtra por momento)
             n_outfits: Número de outfits a generar
             disliked_ids: IDs de prendas que el usuario no quiere
-        
+
         Returns:
             Lista de outfits con prenda_base y complementos
         """
@@ -192,7 +190,6 @@ class RecomendadorOutfits:
             if prenda_id in prendas_base_usadas:
                 continue
 
-            # Asegurar que la prenda tenga la temporada correcta o sea compatible
             complementos = self.recomendar(
                 prenda_candidata,
                 prendas_disponibles,

@@ -90,7 +90,7 @@ class HistorialController extends ChangeNotifier with RecargaInteligente {
           prendaBase: _outfits[idx].prendaBase,
           complementos: _outfits[idx].complementos,
           feedback: feedback,
-          temporada: _outfits[idx].temporada,
+          momento: _outfits[idx].momento,
           tipoGeneracion: _outfits[idx].tipoGeneracion,
           generadoEn: _outfits[idx].generadoEn,
         );

@@ -3,6 +3,8 @@ from datetime import datetime
 from bson import ObjectId
 from typing import Optional
 
+from app.models.momento import momento_de_prenda
+
 
 class PrendaModel:
     """
@@ -15,7 +17,7 @@ class PrendaModel:
         usuario_id: str,
         tipo: str,
         color: str,
-        temporada: str,
+        momento: str,
         confianza_yolo: float,
         imagen_url: str,
         notas: str = ""
@@ -25,7 +27,7 @@ class PrendaModel:
             "usuario_id": ObjectId(usuario_id),
             "tipo": tipo,
             "color": color,
-            "temporada": temporada,
+            "momento": momento,
             "confianza_yolo": round(confianza_yolo, 4),
             "imagen_url": imagen_url,
             "notas": notas,
@@ -44,7 +46,7 @@ class PrendaModel:
             "usuario_id": str(doc.get("usuario_id", "")),
             "tipo": doc.get("tipo", ""),
             "color": doc.get("color", ""),
-            "temporada": doc.get("temporada", ""),
+            "momento": momento_de_prenda(doc),
             "confianza_yolo": doc.get("confianza_yolo", 0.0),
             "imagen_url": doc.get("imagen_url", ""),
             "notas": doc.get("notas", ""),

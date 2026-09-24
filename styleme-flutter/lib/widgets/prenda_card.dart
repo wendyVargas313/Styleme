@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/models/prenda_model.dart';
 
@@ -104,7 +105,7 @@ class PrendaCard extends StatelessWidget {
                     children: [
                       _chip(prenda.color, StyleMeTheme.primary.withValues(alpha: 0.2)),
                       const SizedBox(width: 4),
-                      _chip(_temporadaEmoji(prenda.temporada), StyleMeTheme.card),
+                      _chip(AppConstants.iconoMomento(prenda.momento), StyleMeTheme.card),
                     ],
                   ),
                 ],
@@ -152,15 +153,5 @@ class PrendaCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _temporadaEmoji(String temporada) {
-    const emojis = {
-      'primavera': '🌸',
-      'verano': '☀️',
-      'otono': '🍂',
-      'invierno': '❄️',
-    };
-    return emojis[temporada] ?? temporada;
   }
 }

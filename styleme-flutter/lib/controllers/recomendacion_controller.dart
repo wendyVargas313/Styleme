@@ -50,10 +50,11 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
   bool get sinFotoPerfil => _sinFotoPerfil;
   String? get errorIA => _errorIA;
 
-  // Genera outfit basado en una prenda seleccionada
+  // Genera outfit basado en una prenda seleccionada. `momento` es opcional:
+  // si es null, el backend no filtra candidatos por momento.
   Future<OutfitModel?> generarOutfit({
     required String prendaId,
-    required String temporada,
+    String? momento,
     int topK = 3,
   }) async {
     _estado = RecomendacionEstado.cargando;
@@ -62,25 +63,37 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
     notifyListeners();
 
     try {
-      final response = await _api.post(ApiConfig.recomendarOutfit, data: {
+      final body = <String, dynamic>{
         'prenda_id': prendaId,
-        'temporada': temporada,
         'top_k': topK,
-      });
+      };
+      if (momento != null) body['momento'] = momento;
+
+      final response = await _api.post(ApiConfig.recomendarOutfit, data: body);
 
       final data = response.data as Map<String, dynamic>;
 
       if (data['success'] == true) {
+        final recomendaciones = data['recomendaciones'] as List? ?? [];
+
+        if (recomendaciones.isEmpty) {
+          // El backend no filtra por debajo de un mínimo: si el filtro por
+          // momento deja cero candidatos, responde éxito con lista vacía.
+          _mensajeError = _mensajeSinCandidatos(momento);
+          _estado = RecomendacionEstado.error;
+          return null;
+        }
+
         // Construir el OutfitModel desde la respuesta
         _outfitActual = OutfitModel(
           id: data['outfit_id'] ?? '',
           prendaBase: data['prenda_base'] != null
               ? PrendaModel.fromJson(data['prenda_base'])
               : null,
-          complementos: (data['recomendaciones'] as List? ?? [])
+          complementos: recomendaciones
               .map((r) => ComplementoOutfit.fromJson(r as Map<String, dynamic>))
               .toList(),
-          temporada: temporada,
+          momento: momento,
           tipoGeneracion: 'manual',
           generadoEn: data['generado_en'] ?? '',
         );
@@ -102,8 +115,15 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
     }
   }
 
-  // Carga los outfits del día
-  Future<void> cargarOutfitsDiarios({String temporada = 'invierno'}) async {
+  String _mensajeSinCandidatos(String? momento) {
+    if (momento == 'dia') return 'No tienes suficientes prendas de día para armar un outfit';
+    if (momento == 'noche') return 'No tienes suficientes prendas de noche para armar un outfit';
+    return 'No tienes suficientes prendas compatibles para armar un outfit';
+  }
+
+  // Carga los outfits del día. `momento` es opcional: si es null, el
+  // backend no filtra por momento.
+  Future<void> cargarOutfitsDiarios({String? momento}) async {
     final huboDatosPrevios = _outfitsDelDia.isNotEmpty;
     _estado = RecomendacionEstado.cargando;
     _mensajeError = null;
@@ -112,7 +132,7 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
     try {
       final response = await _api.get(
         ApiConfig.outfitDiario,
-        queryParams: {'temporada': temporada},
+        queryParams: momento != null ? {'momento': momento} : {},
       );
 
       final data = response.data as Map<String, dynamic>;
@@ -129,7 +149,7 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
           complementos: (oMap['complementos'] as List? ?? [])
               .map((c) => ComplementoOutfit.fromJson(c as Map<String, dynamic>))
               .toList(),
-          temporada: data['temporada'] ?? temporada,
+          momento: data['momento'] as String? ?? momento,
           tipoGeneracion: 'diario',
           generadoEn: data['fecha'] ?? '',
         );
@@ -152,8 +172,9 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
     notifyListeners();
   }
 
-  // Genera outfits del día con imagen IA via CatVTON
-  Future<void> cargarOutfitsIA({String temporada = 'invierno'}) async {
+  // Genera outfits del día con imagen IA via CatVTON. `momento` es
+  // opcional: si es null, el backend no filtra por momento.
+  Future<void> cargarOutfitsIA({String? momento}) async {
     if (_generandoIA) return; // Evitar llamadas duplicadas
     _generandoIA = true;
     _sinFotoPerfil = false;
@@ -163,7 +184,7 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
     try {
       final response = await _api.post(
         ApiConfig.outfitsIA,
-        data: {'temporada': temporada},
+        data: momento != null ? {'momento': momento} : {},
       );
       final data = response.data as Map<String, dynamic>;
       _outfitsIA = (data['outfits_ia'] as List? ?? [])

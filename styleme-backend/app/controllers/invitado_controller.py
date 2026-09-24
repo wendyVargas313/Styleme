@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def probar_como_invitado(
     imagenes: List[UploadFile],
     device_id: str,
-    temporada: str,
+    momento: str,
     db
 ) -> dict:
     """
@@ -71,7 +71,7 @@ async def probar_como_invitado(
     archivos_temporales = []
     prendas_detectadas = []
 
-    logger.info(f"🔍 Invitado: {len(imagenes)} imágenes, temporada={temporada}, device={device_id[:8]}...")
+    logger.info(f"🔍 Invitado: {len(imagenes)} imágenes, momento={momento}, device={device_id[:8]}...")
 
     try:
         # Procesar cada imagen con el agente ML
@@ -94,7 +94,7 @@ async def probar_como_invitado(
                 "tipo": resultado.get("tipo", "other"),
                 "color": resultado.get("color", "negro"),
                 "confianza": resultado.get("confianza", 0.0),
-                "temporada": temporada
+                "momento": momento
             }
             prendas_detectadas.append(prenda_detectada)
 

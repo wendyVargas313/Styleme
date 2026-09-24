@@ -4,6 +4,7 @@ from typing import Optional
 
 from app.config.database import get_db
 from app.middleware.auth_middleware import get_usuario_actual
+from app.models.momento import MOMENTO_DEFAULT
 from app.controllers.guardarropa_controller import (
     agregar_prenda,
     listar_prendas,
@@ -21,7 +22,7 @@ async def agregar(
     imagen_sin_fondo: Optional[UploadFile] = File(
         None, description="Recorte PNG con transparencia hecho en el dispositivo (opcional)"
     ),
-    temporada: str = Form(..., description="primavera/verano/otono/invierno"),
+    momento: str = Form(MOMENTO_DEFAULT, description="dia/noche/ambos"),
     notas: Optional[str] = Form("", description="Notas opcionales sobre la prenda"),
     usuario_actual=Depends(get_usuario_actual),
     db=Depends(get_db)
@@ -40,7 +41,7 @@ async def agregar(
         usuario_id=usuario_id,
         imagen_bytes=imagen_bytes,
         nombre_imagen=nombre_imagen,
-        temporada=temporada,
+        momento=momento,
         notas=notas or "",
         db=db,
         imagen_sin_fondo=imagen_sin_fondo
@@ -51,7 +52,7 @@ async def agregar(
 async def listar(
     tipo: Optional[str] = None,
     color: Optional[str] = None,
-    temporada: Optional[str] = None,
+    momento: Optional[str] = None,
     page: int = 1,
     limit: int = 20,
     usuario_actual=Depends(get_usuario_actual),
@@ -59,14 +60,14 @@ async def listar(
 ):
     """
     Lista las prendas del guardarropa con filtros opcionales.
-    Soporta filtro por tipo, color, temporada y paginación.
+    Soporta filtro por tipo, color, momento y paginación.
     """
     usuario_id = str(usuario_actual["_id"])
     return await listar_prendas(
         usuario_id=usuario_id,
         tipo=tipo,
         color=color,
-        temporada=temporada,
+        momento=momento,
         page=page,
         limit=limit,
         db=db

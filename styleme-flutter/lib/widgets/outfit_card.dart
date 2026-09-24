@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/models/outfit_model.dart';
 import 'package:styleme/models/prenda_model.dart';
@@ -106,7 +107,7 @@ class OutfitCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${prenda.color} • ${prenda.temporada}',
+                  '${prenda.color} • ${AppConstants.etiquetaMomento(prenda.momento)}',
                   style: GoogleFonts.poppins(
                     color: StyleMeTheme.textSecondary,
                     fontSize: 12,

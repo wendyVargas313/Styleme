@@ -271,10 +271,10 @@ Imagen del usuario
   KMeans (modelo_color.pkl)
   → Clasifica color dominante (13 colores)
       ↓
-  Guardado en MongoDB con tipo + color + temporada
+  Guardado en MongoDB con tipo + color + momento
       ↓
   Recomendador (modelo_recomendador_outfits.pkl)
-  → score = 0.5×coocurrencia + 0.3×color + 0.2×temporada
+  → score = 0.5×coocurrencia + 0.3×color + 0.2×momento
   → Retorna top-K prendas más compatibles
 ```
 
