@@ -91,7 +91,11 @@ class _GuardarropaScreenState extends State<GuardarropaScreen>
 
   Future<void> _recargarTodo() async {
     final ctrl = context.read<GuardarropaController>();
-    await Future.wait([ctrl.cargarPrendas(resetear: true), ctrl.cargarStats()]);
+    await Future.wait([
+      ctrl.cargarPrendas(resetear: true),
+      ctrl.cargarStats(),
+      ctrl.cargarConteoPorTipo(),
+    ]);
   }
 
   void _snack(String mensaje, {Color? color}) {

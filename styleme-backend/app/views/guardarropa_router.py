@@ -76,14 +76,17 @@ async def listar(
 
 @router.get("/stats", status_code=status.HTTP_200_OK)
 async def stats(
+    momento: Optional[str] = None,
     usuario_actual=Depends(get_usuario_actual),
     db=Depends(get_db)
 ):
     """
     Retorna estadísticas completas del guardarropa del usuario.
+    Sin `momento`: sobre todas las prendas activas (igual que siempre).
+    Con `momento`: solo sobre las prendas que devolvería /listar con ese filtro.
     """
     usuario_id = str(usuario_actual["_id"])
-    return await obtener_stats(usuario_id=usuario_id, db=db)
+    return await obtener_stats(usuario_id=usuario_id, db=db, momento=momento)
 
 
 @router.delete("/{prenda_id}", status_code=status.HTTP_200_OK)

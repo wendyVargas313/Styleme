@@ -82,8 +82,8 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   bool get errorCargarMas => _errorCargarMas;
   bool get hayMas => !_finForzado && _prendas.length < _totalPrendas;
 
-  // Tipos que el usuario tiene (todo el armario, sin filtros), de más a
-  // menos prendas.
+  // Tipos que el usuario tiene para el filtro de clima activo (si hay uno),
+  // de más a menos prendas.
   List<MapEntry<String, int>> get tiposConConteo {
     final tipos = _conteoPorTipo.entries.where((e) => e.value > 0).toList()
       ..sort((a, b) => b.value != a.value
@@ -373,13 +373,32 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     );
   }
 
-  // Estadísticas del armario; de aquí sale también el conteo por tipo de
-  // los chips. Si falla, se conserva lo anterior.
+  // Estadísticas completas del armario para la hoja "Estadísticas" (ícono
+  // de la barra): siempre de TODAS las prendas activas, sin importar el
+  // filtro de clima que esté activo en la cuadrícula. Si falla, se
+  // conserva lo anterior.
   Future<void> cargarStats() async {
     try {
       final response = await _api.get(ApiConfig.statsGuardarropa);
       _stats = response.data as Map<String, dynamic>;
-      final porTipo = _stats['por_tipo'] as Map? ?? {};
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  // Conteo por tipo para los chips de filtro: respeta el filtro de clima
+  // activo (el backend cuenta sobre las mismas prendas que listar_prendas
+  // devolvería con ese filtro), para que el número del chip coincida con
+  // la cuadrícula. Si falla, se conserva el conteo anterior.
+  Future<void> cargarConteoPorTipo() async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (_filtroMomento != null) queryParams['momento'] = _filtroMomento;
+      final response = await _api.get(
+        ApiConfig.statsGuardarropa,
+        queryParams: queryParams,
+      );
+      final data = response.data as Map<String, dynamic>;
+      final porTipo = data['por_tipo'] as Map? ?? {};
       _conteoPorTipo = {
         for (final e in porTipo.entries)
           e.key.toString(): (e.value as num).toInt(),
@@ -388,12 +407,16 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     } catch (_) {}
   }
 
-  // Aplicar filtro (reinicia en la página 1)
+  // Aplicar filtro (reinicia en la página 1). El conteo por tipo de los
+  // chips solo depende del clima: se recarga nada más cuando ese filtro
+  // cambia (no en cada cambio de tipo).
   void aplicarFiltros({String? tipo, String? color, String? momento}) {
+    final climaCambio = momento != _filtroMomento;
     _filtroTipo = tipo;
     _filtroColor = color;
     _filtroMomento = momento;
     cargarPrendas(resetear: true);
+    if (climaCambio) cargarConteoPorTipo();
   }
 
   String _parsearError(Object e, TipoErrorSubida tipo) {

@@ -325,6 +325,46 @@ async def agregar_prenda(
     }
 
 
+def _validar_y_normalizar_momento(momento: str) -> str:
+    """Normaliza (acepta legado dia/noche) o lanza 422 si no es válido."""
+    momento_normalizado = normalizar_momento(momento)
+    if momento_normalizado is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
+        )
+    return momento_normalizado
+
+
+def _filtro_momento(momento_normalizado: str) -> dict:
+    """
+    Arma la cláusula Mongo para filtrar por un momento ya normalizado
+    (soleado/lluvioso/ambos). Compartida por listar_prendas y obtener_stats
+    para que ambas cuenten exactamente las mismas prendas.
+
+    Las prendas "ambos" (versátiles) aparecen en cualquier filtro de
+    soleado/lluvioso, además de en el filtro "ambos".
+    """
+    momentos_objetivo = {momento_normalizado, MOMENTO_DEFAULT}
+
+    # Prendas ya migradas: coincidencia directa por "momento".
+    # Prendas sin migrar (solo tienen "temporada"): se incluyen si su
+    # temporada mapea a alguno de los momentos objetivo (MAPEO_TEMPORADA_A_MOMENTO).
+    temporadas_legacy = [
+        t for t, m in MAPEO_TEMPORADA_A_MOMENTO.items() if m in momentos_objetivo
+    ]
+    or_clauses = [
+        {"momento": {"$in": list(momentos_objetivo)}},
+        {"momento": {"$exists": False}, "temporada": {"$in": temporadas_legacy}}
+    ]
+    # Prendas sin "momento" ni "temporada" (dato incompleto): caen al
+    # default, así que solo aparecen cuando el default está entre los
+    # momentos objetivo (siempre, dado que MOMENTO_DEFAULT = "ambos").
+    if MOMENTO_DEFAULT in momentos_objetivo:
+        or_clauses.append({"momento": {"$exists": False}, "temporada": {"$exists": False}})
+    return {"$or": or_clauses}
+
+
 async def listar_prendas(
     usuario_id: str,
     tipo: str = None,
@@ -351,32 +391,7 @@ async def listar_prendas(
     if color:
         filtro["color"] = color
     if momento:
-        momento_normalizado = normalizar_momento(momento)
-        if momento_normalizado is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
-            )
-        # Las prendas "ambos" (versátiles) aparecen en cualquier filtro de
-        # soleado/lluvioso, además de en el filtro "ambos".
-        momentos_objetivo = {momento_normalizado, MOMENTO_DEFAULT}
-
-        # Prendas ya migradas: coincidencia directa por "momento".
-        # Prendas sin migrar (solo tienen "temporada"): se incluyen si su
-        # temporada mapea a alguno de los momentos objetivo (MAPEO_TEMPORADA_A_MOMENTO).
-        temporadas_legacy = [
-            t for t, m in MAPEO_TEMPORADA_A_MOMENTO.items() if m in momentos_objetivo
-        ]
-        or_clauses = [
-            {"momento": {"$in": list(momentos_objetivo)}},
-            {"momento": {"$exists": False}, "temporada": {"$in": temporadas_legacy}}
-        ]
-        # Prendas sin "momento" ni "temporada" (dato incompleto): caen al
-        # default, así que solo aparecen cuando el default está entre los
-        # momentos objetivo (siempre, dado que MOMENTO_DEFAULT = "ambos").
-        if MOMENTO_DEFAULT in momentos_objetivo:
-            or_clauses.append({"momento": {"$exists": False}, "temporada": {"$exists": False}})
-        filtro["$or"] = or_clauses
+        filtro.update(_filtro_momento(_validar_y_normalizar_momento(momento)))
 
     # Limitar el máximo de prendas por página
     limit = min(limit, 50)
@@ -434,14 +449,22 @@ async def eliminar_prenda(prenda_id: str, usuario_id: str, db) -> dict:
     }
 
 
-async def obtener_stats(usuario_id: str, db) -> dict:
+async def obtener_stats(usuario_id: str, db, momento: str = None) -> dict:
     """
     Obtiene estadísticas del guardarropa del usuario.
-    
+
+    Sin `momento`: se calculan sobre todas las prendas activas (igual que
+    siempre — otros consumidores, como el perfil, no ven ningún cambio).
+    Con `momento`: se calculan SOLO sobre las prendas que devolvería
+    listar_prendas con ese mismo filtro (mismo helper _filtro_momento),
+    para que los chips del armario y la cuadrícula siempre coincidan.
+
     Returns:
         dict con estadísticas detalladas del armario
     """
     filtro_base = {"usuario_id": ObjectId(usuario_id), "activa": True}
+    if momento:
+        filtro_base.update(_filtro_momento(_validar_y_normalizar_momento(momento)))
 
     # Contar total
     total = await db.prendas.count_documents(filtro_base)
