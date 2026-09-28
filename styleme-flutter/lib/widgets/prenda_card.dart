@@ -82,28 +82,24 @@ class PrendaCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 _buildImagen(),
-                // Badge de confianza
-                Positioned(
-                  top: margen,
-                  right: margen,
-                  child: Container(
-                    padding: compacta
-                        ? const EdgeInsets.symmetric(horizontal: 4, vertical: 1)
-                        : const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(compacta ? 6 : 8),
-                    ),
-                    child: Text(
-                      prenda.confianzaTexto,
-                      style: GoogleFonts.poppins(
-                        color: StyleMeTheme.primary,
-                        fontSize: compacta ? 8.5 : 10,
-                        fontWeight: FontWeight.w600,
+                // La IA no está segura y el usuario no la ha revisado.
+                if (prenda.requiereRevision)
+                  Positioned(
+                    top: margen,
+                    right: margen,
+                    child: Container(
+                      padding: EdgeInsets.all(compacta ? 2 : 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        color: StyleMeTheme.warning,
+                        size: compacta ? 12 : 15,
                       ),
                     ),
                   ),
-                ),
                 Positioned(
                   top: margen,
                   left: margen,

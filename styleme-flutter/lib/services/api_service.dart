@@ -67,6 +67,14 @@ class ApiService {
     );
   }
 
+  // ── PATCH ─────────────────────────────────────────────
+  Future<Response> patch(
+    String url, {
+    dynamic data,
+  }) async {
+    return await _dio.patch(url, data: data);
+  }
+
   // ── DELETE ────────────────────────────────────────────
   Future<Response> delete(String url) async {
     return await _dio.delete(url);

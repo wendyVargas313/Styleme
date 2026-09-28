@@ -79,7 +79,7 @@ class StyleMeAgent:
             logger.error(f"❌ Error inicializando ML Agent: {e}")
             raise
 
-    def _procesar_imagen_sync(self, imagen_bytes: bytes) -> dict:
+    def _procesar_imagen_sync(self, imagen_bytes: bytes, clasificar_color: bool = True) -> dict:
         """
         Cuerpo síncrono de procesar_imagen. Corre en un hilo del threadpool
         (ver procesar_imagen) y toma ml_lock durante toda la sección de
@@ -105,9 +105,9 @@ class StyleMeAgent:
                 imagen_recortada = Image.open(io.BytesIO(imagen_bytes)).convert("RGB")
 
             # Paso 3: Clasificar color de la prenda recortada
-            color = self.color_clf.predecir(imagen_recortada)
+            color = self.color_clf.predecir(imagen_recortada) if clasificar_color else None
 
-        return {
+        resultado = {
             "tipo": tipo,
             "color": color,
             "confianza": confianza,
@@ -115,19 +115,57 @@ class StyleMeAgent:
             "detectado": resultado_yolo.get("detectado", False),
             "todas_detecciones": resultado_yolo.get("todas_detecciones", [])
         }
+        if not clasificar_color:
+            # El llamador calculará el color después (ver clasificar_color)
+            # y necesita el recorte para el respaldo.
+            resultado["imagen_recortada"] = imagen_recortada
+        return resultado
 
-    async def procesar_imagen(self, imagen_bytes: bytes) -> dict:
+    async def procesar_imagen(self, imagen_bytes: bytes, clasificar_color: bool = True) -> dict:
         """
         Pipeline completo de procesamiento de imagen.
         imagen → YOLO (detección) → recorte → KMeans (color) → resultado
 
         Args:
             imagen_bytes: Imagen en bytes (JPG/PNG)
+            clasificar_color: False para omitir el color; el resultado trae
+                entonces "imagen_recortada" para pasarla a clasificar_color()
 
         Returns:
             dict con tipo, color, confianza, bbox
         """
-        return await run_in_threadpool(self._procesar_imagen_sync, imagen_bytes)
+        return await run_in_threadpool(self._procesar_imagen_sync, imagen_bytes, clasificar_color)
+
+    def _clasificar_color_sync(self, imagen_mascara, imagen_recortada) -> tuple:
+        with ml_lock:
+            if imagen_mascara is not None:
+                try:
+                    rgb = self.color_clf.color_dominante_mascara(imagen_mascara)
+                    if rgb is not None:
+                        return self.color_clf.clasificar_rgb(rgb), True, rgb
+                    logger.info("   Máscara insuficiente para el color — usando recorte")
+                except Exception as e:
+                    logger.warning(f"color con máscara falló ({e}) — usando recorte")
+            try:
+                rgb = self.color_clf.color_dominante(imagen_recortada)
+                return self.color_clf.clasificar_rgb(rgb), False, rgb
+            except Exception as e:
+                logger.error(f"❌ Error en clasificación de color: {e}")
+                return "negro", False, None
+
+    async def clasificar_color(self, imagen_mascara, imagen_recortada) -> tuple:
+        """
+        Color de la prenda a partir de su máscara (imagen RGBA de ML Kit o
+        rembg); si no hay máscara, es insuficiente o falla, usa el método
+        de recorte YOLO como respaldo. En ambos caminos el RGB dominante se
+        nombra con la clasificación C2 (ClasificadorColor.clasificar_rgb).
+
+        Returns:
+            (color, uso_mascara, rgb dominante en [0, 1] o None si falló)
+        """
+        return await run_in_threadpool(
+            self._clasificar_color_sync, imagen_mascara, imagen_recortada
+        )
 
     async def recomendar_outfit(
         self,

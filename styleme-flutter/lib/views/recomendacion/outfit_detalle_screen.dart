@@ -185,8 +185,6 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
                   _infoChip(prenda.color, Icons.palette),
                   const SizedBox(height: 4),
                   _infoChip(AppConstants.etiquetaMomento(prenda.momento), Icons.wb_sunny_outlined),
-                  const SizedBox(height: 4),
-                  _infoChip('Confianza: ${prenda.confianzaTexto}', Icons.psychology),
                 ],
               ),
             ),

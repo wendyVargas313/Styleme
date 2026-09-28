@@ -242,7 +242,6 @@ class _GuestScreenState extends State<GuestScreen> {
       prendaBase = {
         'tipo': baseData['tipo'] ?? '',
         'color': baseData['color'] ?? '',
-        'confianza': (baseData['confianza'] ?? 0.0).toDouble(),
         'imagen_url': _imagenes.isNotEmpty ? _imagenes[0].path : '',
       };
 
@@ -254,7 +253,7 @@ class _GuestScreenState extends State<GuestScreen> {
         complementos.add({
           'tipo': pData['tipo'] ?? '',
           'color': pData['color'] ?? '',
-          'score': ((cMap['score'] ?? pData['confianza'] ?? 0.0) as num).toDouble(),
+          'score': ((cMap['score'] ?? 0.0) as num).toDouble(),
           'imagen_url': imgIdx < _imagenes.length ? _imagenes[imgIdx].path : '',
         });
         imgIdx++;
@@ -298,7 +297,6 @@ class _GuestScreenState extends State<GuestScreen> {
               itemCount: _imagenes.length,
               itemBuilder: (_, i) {
                 final p = i < prendas.length ? prendas[i] : null;
-                final conf = ((p?['confianza'] ?? 0.0) as num) * 100;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Stack(
@@ -325,7 +323,7 @@ class _GuestScreenState extends State<GuestScreen> {
                                   bottom: Radius.circular(10)),
                             ),
                             child: Text(
-                              '${AppConstants.etiquetaTipo(p['tipo'] as String?)} • ${conf.toStringAsFixed(0)}%',
+                              AppConstants.etiquetaTipo(p['tipo'] as String?),
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 8,
@@ -417,7 +415,6 @@ class _GuestScreenState extends State<GuestScreen> {
   }
 
   Widget _prendaDetectada(Map<String, dynamic> p) {
-    final confianza = (((p['confianza'] ?? 0.0) as num) * 100).toStringAsFixed(0);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -446,13 +443,6 @@ class _GuestScreenState extends State<GuestScreen> {
                 ),
               ],
             ),
-          ),
-          Text(
-            '$confianza%',
-            style: GoogleFonts.poppins(
-                color: StyleMeTheme.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: 15),
           ),
         ],
       ),

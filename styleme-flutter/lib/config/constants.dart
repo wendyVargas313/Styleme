@@ -1,4 +1,6 @@
 // StyleMe - Constantes globales de la aplicación
+import 'dart:ui' show Color;
+
 class AppConstants {
   static const String appName = 'StyleMe';
   static const String tokenKey = 'auth_token';
@@ -55,12 +57,47 @@ class AppConstants {
     'none': '',
   };
 
-  // Colores del modelo ML
-  static const List<String> coloresML = [
-    'negro', 'blanco', 'gris', 'rojo', 'rosa', 'azul',
-    'azul marino', 'verde', 'amarillo', 'naranja', 'morado',
-    'beige', 'cafe',
+  // Los 13 colores del clasificador (valor interno idéntico al del backend)
+  // con un color de muestra para pintar el círculo. Debe mantenerse
+  // sincronizado a mano con ClasificadorColor.COLORES en
+  // styleme-backend/app/ml/color_classifier.py.
+  static const List<(String, Color)> colores = [
+    ('negro', Color(0xFF1A1A1A)),
+    ('blanco', Color(0xFFF5F5F5)),
+    ('gris', Color(0xFF808080)),
+    ('rojo', Color(0xFFE53935)),
+    ('rosa', Color(0xFFEC407A)),
+    ('azul', Color(0xFF1E88E5)),
+    ('azul marino', Color(0xFF1A237E)),
+    ('verde', Color(0xFF43A047)),
+    ('amarillo', Color(0xFFFDD835)),
+    ('naranja', Color(0xFFFF6B00)),
+    ('morado', Color(0xFF8E24AA)),
+    ('beige', Color(0xFFF5DEB3)),
+    ('cafe', Color(0xFF795548)),
   ];
+
+  static const Map<String, String> _colorEtiquetas = {'cafe': 'Café'};
+
+  // Muestra del color; null si el valor no es uno de los 13.
+  static Color? muestraColor(String? color) {
+    for (final (nombre, muestra) in colores) {
+      if (nombre == color?.toLowerCase()) return muestra;
+    }
+    return null;
+  }
+
+  // Nombre visible del color ("azul marino" → "Azul marino", "cafe" → "Café").
+  static String etiquetaColor(String color) {
+    final especial = _colorEtiquetas[color];
+    if (especial != null) return especial;
+    if (color.isEmpty) return color;
+    return color[0].toUpperCase() + color.substring(1);
+  }
+
+  // Por debajo de esta confianza de YOLO (y sin corrección del usuario) la
+  // prenda se marca para revisión.
+  static const double umbralRevision = 0.5;
 
   // Clases del modelo YOLO (valor que guarda y filtra el backend, en inglés)
   // → etiqueta visible en español.

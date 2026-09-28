@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/controllers/mixins/recarga_inteligente.dart';
 import 'package:styleme/models/prenda_model.dart';
 import 'package:styleme/services/api_service.dart';
@@ -371,6 +372,80 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
       fallidas: fallidas,
       conexionPerdida: conexionPerdida,
     );
+  }
+
+  // Corrige tipo, color y/o clima (solo se envían los que no son null).
+  // Devuelve la prenda actualizada o un mensaje de error; nunca lanza.
+  // `anterior` es la prenda tal como la veía el usuario antes de editar, para
+  // ajustar el conteo por tipo aunque no esté en la página cargada.
+  Future<({PrendaModel? prenda, String? error})> editarPrenda(
+    PrendaModel anterior, {
+    String? tipo,
+    String? color,
+    String? momento,
+  }) async {
+    try {
+      final response = await _api.patch(
+        ApiConfig.editarPrenda(anterior.id),
+        data: {
+          if (tipo != null) 'tipo': tipo,
+          if (color != null) 'color': color,
+          if (momento != null) 'momento': momento,
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+      final editada = PrendaModel.fromJson(data['prenda'] as Map<String, dynamic>);
+      _aplicarEdicionLocal(anterior, editada);
+      notifyListeners();
+      return (prenda: editada, error: null);
+    } catch (e) {
+      if (_clasificarError(e) != TipoErrorSubida.deLaFoto) {
+        return (
+          prenda: null,
+          error: 'Sin conexión: los cambios no se guardaron. Intenta de nuevo.',
+        );
+      }
+      final data = e is DioException ? e.response?.data : null;
+      final detalle = (data is Map && data['detail'] is String) ? data['detail'] as String : null;
+      return (prenda: null, error: detalle ?? 'No se pudieron guardar los cambios');
+    }
+  }
+
+  // Misma regla que _filtro_momento del backend: el filtro de un clima
+  // incluye las versátiles.
+  bool _coincideConClima(String momento) {
+    final filtro = _filtroMomento;
+    if (filtro == null) return true;
+    return momento == filtro || momento == AppConstants.momentoDefault;
+  }
+
+  // Refleja una edición sin recargar: reemplaza la prenda en la lista (o la
+  // saca si ya no cumple los filtros activos) y mueve el conteo por tipo,
+  // que solo cuenta las prendas del clima filtrado.
+  void _aplicarEdicionLocal(PrendaModel anterior, PrendaModel editada) {
+    if (_coincideConClima(anterior.momento)) {
+      final restante = conteoDeTipo(anterior.tipo) - 1;
+      if (restante > 0) {
+        _conteoPorTipo[anterior.tipo] = restante;
+      } else {
+        _conteoPorTipo.remove(anterior.tipo);
+      }
+    }
+    if (_coincideConClima(editada.momento)) {
+      _conteoPorTipo[editada.tipo] = conteoDeTipo(editada.tipo) + 1;
+    }
+
+    final idx = _prendas.indexWhere((p) => p.id == editada.id);
+    if (idx == -1) return;
+    final sigueEnFiltro = (_filtroTipo == null || editada.tipo == _filtroTipo) &&
+        (_filtroColor == null || editada.color == _filtroColor) &&
+        _coincideConClima(editada.momento);
+    if (sigueEnFiltro) {
+      _prendas[idx] = editada;
+    } else {
+      _prendas.removeAt(idx);
+      _totalPrendas = (_totalPrendas - 1).clamp(0, 9999);
+    }
   }
 
   // Estadísticas completas del armario para la hoja "Estadísticas" (ícono

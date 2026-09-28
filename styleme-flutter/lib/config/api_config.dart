@@ -26,6 +26,7 @@ class ApiConfig {
   static const String listarPrendas = '$apiPrefix/guardarropa/listar';
   static const String statsGuardarropa = '$apiPrefix/guardarropa/stats';
   static String eliminarPrenda(String id) => '$apiPrefix/guardarropa/$id';
+  static String editarPrenda(String id) => '$apiPrefix/guardarropa/$id';
 
   // Endpoints de Recomendaciones
   static const String recomendarOutfit = '$apiPrefix/recomendar/outfit';

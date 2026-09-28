@@ -5,10 +5,12 @@ from typing import Optional
 from app.config.database import get_db
 from app.middleware.auth_middleware import get_usuario_actual
 from app.models.momento import MOMENTO_DEFAULT
+from app.schemas.prenda_schema import EditarPrendaRequest
 from app.controllers.guardarropa_controller import (
     agregar_prenda,
     listar_prendas,
     eliminar_prenda,
+    editar_prenda,
     obtener_stats,
     validar_imagen
 )
@@ -87,6 +89,28 @@ async def stats(
     """
     usuario_id = str(usuario_actual["_id"])
     return await obtener_stats(usuario_id=usuario_id, db=db, momento=momento)
+
+
+@router.patch("/{prenda_id}", status_code=status.HTTP_200_OK)
+async def editar(
+    prenda_id: str,
+    datos: EditarPrendaRequest,
+    usuario_actual=Depends(get_usuario_actual),
+    db=Depends(get_db)
+):
+    """
+    Corrige tipo, color y/o momento de una prenda (campos opcionales).
+    Solo el propietario puede editar sus prendas activas.
+    """
+    usuario_id = str(usuario_actual["_id"])
+    return await editar_prenda(
+        prenda_id=prenda_id,
+        usuario_id=usuario_id,
+        db=db,
+        tipo=datos.tipo,
+        color=datos.color,
+        momento=datos.momento,
+    )
 
 
 @router.delete("/{prenda_id}", status_code=status.HTTP_200_OK)

@@ -38,7 +38,6 @@ class OutfitVisualCard extends StatelessWidget {
         ? {
             'tipo': outfit.prendaBase!.tipo,
             'color': outfit.prendaBase!.color,
-            'confianza': outfit.prendaBase!.confianzaYolo,
             'imagen_url': outfit.prendaBase!.imagenUrlCompleta(ApiConfig.baseUrl),
           }
         : <String, dynamic>{};
@@ -63,30 +62,13 @@ class OutfitVisualCard extends StatelessWidget {
     );
   }
 
-  double get _scorePromedio {
-    if (complementos.isEmpty) return (prendaBase['confianza'] as num?)?.toDouble() ?? 0.0;
+  // Compatibilidad promedio de los complementos. Sin complementos no hay
+  // compatibilidad que mostrar (null), en vez de caer a la confianza de YOLO.
+  double? get _scorePromedio {
+    if (complementos.isEmpty) return null;
     final sum = complementos.fold<double>(
         0, (acc, c) => acc + ((c['score'] as num?)?.toDouble() ?? 0.0));
     return sum / complementos.length;
-  }
-
-  Color _colorParaNombre(String nombre) {
-    const mapa = {
-      'negro': Color(0xFF1A1A1A),
-      'blanco': Color(0xFFF5F5F5),
-      'gris': Color(0xFF808080),
-      'rojo': Color(0xFFE53935),
-      'rosa': Color(0xFFEC407A),
-      'azul': Color(0xFF1E88E5),
-      'azul marino': Color(0xFF1A237E),
-      'verde': Color(0xFF43A047),
-      'amarillo': Color(0xFFFDD835),
-      'naranja': Color(0xFFFF6B00),
-      'morado': Color(0xFF8E24AA),
-      'beige': Color(0xFFF5DEB3),
-      'cafe': Color(0xFF795548),
-    };
-    return mapa[nombre.toLowerCase()] ?? StyleMeTheme.textSecondary;
   }
 
   @override
@@ -98,8 +80,8 @@ class OutfitVisualCard extends StatelessWidget {
   Widget _buildCompleto(BuildContext context) {
     final todasLasPrendas = [prendaBase, ...complementos];
     final score = _scorePromedio;
-    final pct = (score * 100).toStringAsFixed(1);
-    final scoreColor = score >= 0.6 ? StyleMeTheme.primary : StyleMeTheme.textSecondary;
+    final pct = score == null ? '' : (score * 100).toStringAsFixed(1);
+    final scoreColor = (score ?? 0) >= 0.6 ? StyleMeTheme.primary : StyleMeTheme.textSecondary;
 
     return Container(
       decoration: BoxDecoration(
@@ -127,22 +109,23 @@ class OutfitVisualCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: scoreColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: scoreColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    '$pct%',
-                    style: GoogleFonts.poppins(
-                      color: scoreColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                if (score != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: scoreColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: scoreColor.withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      '$pct%',
+                      style: GoogleFonts.poppins(
+                        color: scoreColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -156,6 +139,7 @@ class OutfitVisualCard extends StatelessWidget {
           const SizedBox(height: 14),
 
           // ── Barra de compatibilidad ──────────────────────
+          if (score != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -259,9 +243,7 @@ class OutfitVisualCard extends StatelessWidget {
 
     final tipo = AppConstants.etiquetaTipo(p['tipo'] as String?);
     final color = p['color'] as String? ?? '';
-    final score = (p['score'] as num?)?.toDouble() ??
-        (p['confianza'] as num?)?.toDouble() ??
-        0.0;
+    final score = (p['score'] as num?)?.toDouble() ?? 0.0;
     final imagenUrl = p['imagen_url'] as String? ?? '';
     final scoreColor = score >= 0.6 ? StyleMeTheme.primary : StyleMeTheme.textSecondary;
 
@@ -308,7 +290,7 @@ class OutfitVisualCard extends StatelessWidget {
                           width: 9,
                           height: 9,
                           decoration: BoxDecoration(
-                            color: _colorParaNombre(color),
+                            color: AppConstants.muestraColor(color) ?? StyleMeTheme.textSecondary,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white24, width: 0.5),
                           ),
@@ -455,7 +437,6 @@ class OutfitVisualCard extends StatelessWidget {
   // ── Versión compacta para Home ───────────────────────────
   Widget _buildCompacto() {
     final score = _scorePromedio;
-    final pct = (score * 100).toStringAsFixed(0);
     final img1 = prendaBase['imagen_url'] as String? ?? '';
     final img2 = complementos.isNotEmpty
         ? complementos[0]['imagen_url'] as String? ?? ''
@@ -497,6 +478,7 @@ class OutfitVisualCard extends StatelessWidget {
               ],
             ),
           ),
+          if (score != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             child: Column(
@@ -514,7 +496,7 @@ class OutfitVisualCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '$pct% compatible',
+                  '${(score * 100).toStringAsFixed(0)}% compatible',
                   style: GoogleFonts.poppins(
                     color: StyleMeTheme.primary,
                     fontSize: 10,

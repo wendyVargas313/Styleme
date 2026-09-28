@@ -1,7 +1,7 @@
 # StyleMe - Modelo de datos para Prenda en MongoDB
 from datetime import datetime
 from bson import ObjectId
-from typing import Optional
+from typing import List, Optional
 
 from app.models.momento import momento_de_prenda
 
@@ -20,13 +20,25 @@ class PrendaModel:
         momento: str,
         confianza_yolo: float,
         imagen_url: str,
-        notas: str = ""
+        notas: str = "",
+        color_metodo: Optional[str] = None,
+        color_rgb: Optional[List[int]] = None,
+        color_version: Optional[int] = None
     ) -> dict:
-        """Crea un nuevo documento de prenda para insertar en MongoDB."""
+        """
+        Crea un nuevo documento de prenda para insertar en MongoDB.
+        color_metodo ("mascara_mlkit" | "mascara_rembg" | "recorte"),
+        color_rgb ([r, g, b] 0–255 del color dominante) y color_version
+        (clasificación usada; 2 = C2) son solo registro interno: no se
+        incluyen en serializar().
+        """
         return {
             "usuario_id": ObjectId(usuario_id),
             "tipo": tipo,
             "color": color,
+            "color_metodo": color_metodo,
+            "color_rgb": color_rgb,
+            "color_version": color_version,
             "momento": momento,
             "confianza_yolo": round(confianza_yolo, 4),
             "imagen_url": imagen_url,
@@ -52,5 +64,6 @@ class PrendaModel:
             "notas": doc.get("notas", ""),
             "veces_usado": doc.get("veces_usado", 0),
             "activa": doc.get("activa", True),
+            "editado_por_usuario": doc.get("editado_por_usuario", False),
             "creado_en": doc.get("creado_en", datetime.utcnow()).isoformat()
         }

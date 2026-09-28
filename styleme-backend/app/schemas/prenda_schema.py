@@ -18,6 +18,17 @@ class AgregarPrendaRequest(BaseModel):
         return normalizado
 
 
+class EditarPrendaRequest(BaseModel):
+    """
+    Corrección manual de una prenda. Todos los campos son opcionales: el que
+    no venga (o venga null) no se toca. La validación de valores vive en
+    guardarropa_controller.editar_prenda.
+    """
+    tipo: Optional[str] = Field(None, description="Clase YOLO en inglés (p. ej. 'shoe')")
+    color: Optional[str] = Field(None, description="Uno de los 13 colores del clasificador")
+    momento: Optional[str] = Field(None, description="soleado/lluvioso/ambos (acepta dia/noche)")
+
+
 class PrendaResponse(BaseModel):
     """Schema de respuesta con datos de una prenda."""
     id: str

@@ -9,14 +9,34 @@ import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
 import 'package:styleme/models/prenda_model.dart';
+import 'package:styleme/widgets/editar_prenda_sheet.dart';
 
-class DetallePrendaScreen extends StatelessWidget {
+class DetallePrendaScreen extends StatefulWidget {
   final PrendaModel prenda;
 
   const DetallePrendaScreen({super.key, required this.prenda});
 
   @override
+  State<DetallePrendaScreen> createState() => _DetallePrendaScreenState();
+}
+
+class _DetallePrendaScreenState extends State<DetallePrendaScreen> {
+  // Se reemplaza tras una edición para que el detalle se vea actualizado sin
+  // volver al armario.
+  late PrendaModel _prenda = widget.prenda;
+
+  Future<void> _editar() async {
+    final editada = await EditarPrendaSheet.mostrar(context, _prenda);
+    if (editada == null || !mounted) return;
+    setState(() => _prenda = editada);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Prenda actualizada')),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final prenda = _prenda;
     return Scaffold(
       backgroundColor: StyleMeTheme.background,
       body: CustomScrollView(
@@ -60,31 +80,6 @@ class DetallePrendaScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Badge de confianza
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: SafeArea(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: StyleMeTheme.primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.psychology, color: Colors.white, size: 14),
-                            const SizedBox(width: 4),
-                            Text(
-                              prenda.confianzaTexto,
-                              style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -95,6 +90,10 @@ class DetallePrendaScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                if (prenda.requiereRevision) ...[
+                  _avisoRevision(),
+                  const SizedBox(height: 16),
+                ],
                 // Nombre del tipo
                 Text(
                   AppConstants.etiquetaTipo(prenda.tipo),
@@ -122,10 +121,9 @@ class DetallePrendaScreen extends StatelessWidget {
                 const SizedBox(height: 20),
 
                 // Detalles adicionales
-                _infoCard('Información de detección', [
-                  ('Tipo detectado', AppConstants.etiquetaTipo(prenda.tipo)),
+                _infoCard('Información de la prenda', [
+                  ('Tipo', AppConstants.etiquetaTipo(prenda.tipo)),
                   ('Color predominante', prenda.color),
-                  ('Confianza ML', prenda.confianzaTexto),
                   ('Clima', AppConstants.etiquetaMomento(prenda.momento)),
                   ('Agregada', _formatearFecha(prenda.creadoEn)),
                 ]),
@@ -151,6 +149,17 @@ class DetallePrendaScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
+                // Botón editar
+                _botonAccion(
+                  context,
+                  texto: 'Editar prenda',
+                  icono: Icons.edit_outlined,
+                  color: StyleMeTheme.primary,
+                  onTap: _editar,
+                  outline: true,
+                ),
+                const SizedBox(height: 12),
+
                 // Botón eliminar
                 _botonAccion(
                   context,
@@ -162,6 +171,36 @@ class DetallePrendaScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
               ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avisoRevision() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      decoration: BoxDecoration(
+        color: StyleMeTheme.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: StyleMeTheme.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: StyleMeTheme.warning, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'La IA no está segura de esta prenda. Revisa el tipo y el color.',
+              style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _editar,
+            child: Text(
+              'Editar',
+              style: GoogleFonts.poppins(color: StyleMeTheme.warning, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -255,7 +294,7 @@ class DetallePrendaScreen extends StatelessWidget {
         backgroundColor: StyleMeTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Eliminar prenda', style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontWeight: FontWeight.bold)),
-        content: Text('¿Seguro que quieres eliminar "${AppConstants.etiquetaTipo(prenda.tipo)}"? Esta acción no se puede deshacer.',
+        content: Text('¿Seguro que quieres eliminar "${AppConstants.etiquetaTipo(_prenda.tipo)}"? Esta acción no se puede deshacer.',
             style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13)),
         actions: [
           TextButton(
@@ -266,7 +305,7 @@ class DetallePrendaScreen extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(context); // Cerrar dialog
               final ctrl = context.read<GuardarropaController>();
-              final ok = await ctrl.eliminarPrenda(prenda.id);
+              final ok = await ctrl.eliminarPrenda(_prenda.id);
               if (context.mounted) {
                 Navigator.pop(context); // Volver al guardarropa
                 if (ok) {

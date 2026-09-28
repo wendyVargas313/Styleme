@@ -12,6 +12,8 @@ class PrendaModel {
   final int vecesUsado;
   final bool activa;
   final String creadoEn;
+  // El usuario corrigió tipo, color o clima a mano.
+  final bool editadoPorUsuario;
 
   PrendaModel({
     required this.id,
@@ -24,6 +26,7 @@ class PrendaModel {
     this.vecesUsado = 0,
     this.activa = true,
     required this.creadoEn,
+    this.editadoPorUsuario = false,
   });
 
   factory PrendaModel.fromJson(Map<String, dynamic> json) {
@@ -39,6 +42,7 @@ class PrendaModel {
       vecesUsado: json['veces_usado'] ?? 0,
       activa: json['activa'] ?? true,
       creadoEn: json['creado_en'] ?? '',
+      editadoPorUsuario: json['editado_por_usuario'] ?? false,
     );
   }
 
@@ -53,6 +57,7 @@ class PrendaModel {
         'veces_usado': vecesUsado,
         'activa': activa,
         'creado_en': creadoEn,
+        'editado_por_usuario': editadoPorUsuario,
       };
 
   // URL completa de la imagen
@@ -61,6 +66,11 @@ class PrendaModel {
     return '$baseUrl$imagenUrl';
   }
 
-  // Porcentaje de confianza formateado
-  String get confianzaTexto => '${(confianzaYolo * 100).toStringAsFixed(0)}%';
+  // La IA no está segura (baja confianza o clase comodín) y el usuario aún
+  // no la revisó.
+  bool get requiereRevision =>
+      !editadoPorUsuario &&
+      (confianzaYolo < AppConstants.umbralRevision ||
+          tipo == 'not sure' ||
+          tipo == 'other');
 }

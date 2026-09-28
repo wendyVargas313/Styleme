@@ -7,11 +7,13 @@ import time
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 from PIL import Image
 from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import HTTPException, status, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from pymongo import ReturnDocument
 
 from app.config.database import get_db
 from app.config.settings import settings
@@ -24,6 +26,8 @@ from app.models.momento import (
     normalizar_momento,
 )
 from app.ml.ml_agent import ml_agent, ml_lock
+from app.ml.detector import DetectorPrendas
+from app.ml.color_classifier import ClasificadorColor, COLOR_VERSION
 from app.services.imagen_service import normalizar_orientacion
 
 logger = logging.getLogger(__name__)
@@ -104,7 +108,9 @@ def _centrar_en_tarjeta_blanca(img_rgba: Image.Image, size: int = 512) -> bytes:
     return buf_salida.getvalue()
 
 
-def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float = 0.12) -> bytes:
+def generar_imagen_tarjeta(
+    imagen_bytes: bytes, bbox: list, padding_pct: float = 0.12
+) -> Tuple[bytes, Optional[Image.Image]]:
     """
     Recorta la prenda detectada por YOLO, elimina el fondo
     con rembg y la centra sobre fondo blanco 512x512.
@@ -114,6 +120,9 @@ def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float =
     2. Recortar bbox de YOLO con margen
     3. Quitar fondo con rembg (imagen RGBA con transparencia)
     4. Pegar sobre fondo blanco 512x512
+
+    Returns:
+        (tarjeta JPEG, recorte RGBA de rembg para el color — None si rembg falló)
     """
     from rembg import remove as rembg_remove
 
@@ -141,21 +150,28 @@ def generar_imagen_tarjeta(imagen_bytes: bytes, bbox: list, padding_pct: float =
         with ml_lock:
             resultado_bytes = rembg_remove(buf_entrada.read(), session=_obtener_rembg_session())
         img_sin_fondo = Image.open(io.BytesIO(resultado_bytes)).convert("RGBA")
+        mascara = img_sin_fondo.copy()
 
     except Exception as e:
         # Si rembg falla, usar imagen recortada sin quitar fondo
         logger.warning(f"rembg falló, usando recorte simple: {e}")
         img_sin_fondo = img.convert("RGBA")
+        mascara = None
 
     # Paso 4: centrar sobre fondo blanco 512x512
-    return _centrar_en_tarjeta_blanca(img_sin_fondo)
+    return _centrar_en_tarjeta_blanca(img_sin_fondo), mascara
 
 
-def generar_tarjeta_desde_recorte(png_bytes: bytes, padding_pct: float = 0.12) -> bytes:
+def generar_tarjeta_desde_recorte(
+    png_bytes: bytes, padding_pct: float = 0.12
+) -> Tuple[bytes, Image.Image]:
     """
     Genera la tarjeta 512x512 a partir de un recorte PNG con transparencia
     hecho en el dispositivo (p. ej. ML Kit Subject Segmentation), sin pasar
     por rembg. No toma ml_lock: no hay inferencia de modelo, solo PIL.
+
+    Returns:
+        (tarjeta JPEG, recorte RGBA al contorno del sujeto para el color)
 
     Raises:
         ValueError: si el canal alfa no tiene un sujeto detectable.
@@ -184,7 +200,7 @@ def generar_tarjeta_desde_recorte(png_bytes: bytes, padding_pct: float = 0.12) -
     y2 = min(img.height, y2 + pad_y)
     img = img.crop((x1, y1, x2, y2))
 
-    return _centrar_en_tarjeta_blanca(img)
+    return _centrar_en_tarjeta_blanca(img.copy()), img
 
 
 async def guardar_imagen_local(
@@ -228,11 +244,12 @@ async def agregar_prenda(
     Agrega una nueva prenda al guardarropa del usuario.
 
     Proceso:
-    1. Procesar imagen con el agente ML (YOLO + KMeans) — siempre sobre `imagen`
+    1. Detectar tipo con YOLO — siempre sobre `imagen`
     2. Generar tarjeta 512x512 (desde imagen_sin_fondo si llega y es válida,
-       si no con el flujo actual de rembg)
-    3. Guardar imagen en /uploads/
-    4. Crear documento en MongoDB
+       si no con el flujo actual de rembg) y conservar su máscara RGBA
+    3. Clasificar color sobre la máscara (respaldo: recorte YOLO)
+    4. Guardar imagen en /uploads/
+    5. Crear documento en MongoDB
 
     Returns:
         dict con éxito y datos de la prenda detectada
@@ -244,21 +261,22 @@ async def agregar_prenda(
             detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
         )
 
-    # Procesar imagen con ML — siempre sobre la foto original
+    # Detectar tipo con ML — siempre sobre la foto original. El color se
+    # calcula después, cuando ya se tiene la máscara de la prenda.
     logger.info(f"🔍 Procesando imagen con ML para usuario {usuario_id}")
-    resultado_ml = await ml_agent.procesar_imagen(imagen_bytes)
+    resultado_ml = await ml_agent.procesar_imagen(imagen_bytes, clasificar_color=False)
 
     tipo = resultado_ml.get("tipo", "other")
-    color = resultado_ml.get("color", "negro")
     confianza = resultado_ml.get("confianza", 0.0)
     bbox = resultado_ml.get("bbox", [])
 
     logger.info(f"   Tipo detectado: {tipo} ({confianza:.1%})")
-    logger.info(f"   Color detectado: {color}")
 
     # Generar tarjeta: preferir el recorte del dispositivo si llega y es válido
     t_inicio_tarjeta = time.perf_counter()
     imagen_tarjeta = None
+    mascara = None
+    origen_mascara = None
     ruta_usada = None
 
     if imagen_sin_fondo is not None:
@@ -275,20 +293,32 @@ async def agregar_prenda(
             )
         else:
             try:
-                imagen_tarjeta = await run_in_threadpool(
+                imagen_tarjeta, mascara = await run_in_threadpool(
                     generar_tarjeta_desde_recorte, contenido_sin_fondo
                 )
+                origen_mascara = "mascara_mlkit"
                 ruta_usada = "tarjeta desde recorte del dispositivo"
             except Exception as e:
                 logger.warning(f"generar_tarjeta_desde_recorte falló ({e}) — usando flujo rembg")
                 imagen_tarjeta = None
 
     if imagen_tarjeta is None:
-        imagen_tarjeta = await run_in_threadpool(generar_imagen_tarjeta, imagen_bytes, bbox)
+        imagen_tarjeta, mascara = await run_in_threadpool(generar_imagen_tarjeta, imagen_bytes, bbox)
+        origen_mascara = "mascara_rembg"
         ruta_usada = "tarjeta con rembg"
 
     duracion_ms = (time.perf_counter() - t_inicio_tarjeta) * 1000
     logger.info(f"   Imagen procesada: {ruta_usada} ({duracion_ms:.0f} ms)")
+
+    # Color sobre los píxeles de la prenda (alfa > 128); respaldo: recorte YOLO
+    color, uso_mascara, rgb_dominante = await ml_agent.clasificar_color(
+        mascara, resultado_ml["imagen_recortada"]
+    )
+    color_metodo = origen_mascara if uso_mascara else "recorte"
+    color_rgb = (
+        [int(round(v * 255)) for v in rgb_dominante] if rgb_dominante is not None else None
+    )
+    logger.info(f"   Color detectado: {color} ({color_metodo}, RGB {color_rgb})")
 
     # Guardar imagen procesada localmente
     imagen_url = await guardar_imagen_local(imagen_tarjeta, usuario_id, nombre_imagen)
@@ -301,7 +331,10 @@ async def agregar_prenda(
         momento=momento,
         confianza_yolo=confianza,
         imagen_url=imagen_url,
-        notas=notas
+        notas=notas,
+        color_metodo=color_metodo,
+        color_rgb=color_rgb,
+        color_version=COLOR_VERSION
     )
 
     # Insertar en MongoDB
@@ -446,6 +479,77 @@ async def eliminar_prenda(prenda_id: str, usuario_id: str, db) -> dict:
     return {
         "success": True,
         "mensaje": "Prenda eliminada correctamente"
+    }
+
+
+async def editar_prenda(
+    prenda_id: str,
+    usuario_id: str,
+    db,
+    tipo: Optional[str] = None,
+    color: Optional[str] = None,
+    momento: Optional[str] = None,
+) -> dict:
+    """
+    Corrección manual de tipo, color y/o momento de una prenda propia y activa.
+
+    Solo se tocan los campos que vienen (no None). Marca la prenda como
+    editada por el usuario; confianza_yolo se conserva tal cual (sigue
+    describiendo lo que detectó el modelo, no lo que corrigió el usuario).
+
+    Raises:
+        HTTPException 422: valor inválido o ningún campo enviado.
+        HTTPException 404: la prenda no existe, no es del usuario o está inactiva.
+    """
+    cambios = {}
+    if tipo is not None:
+        if tipo not in DetectorPrendas.CLASES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Tipo debe ser uno de: {DetectorPrendas.CLASES}"
+            )
+        cambios["tipo"] = tipo
+    if color is not None:
+        if color not in ClasificadorColor.COLORES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Color debe ser uno de: {ClasificadorColor.COLORES}"
+            )
+        cambios["color"] = color
+    if momento is not None:
+        cambios["momento"] = _validar_y_normalizar_momento(momento)
+
+    if not cambios:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Envía al menos uno de: tipo, color, momento"
+        )
+
+    no_encontrada = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Prenda no encontrada o no tienes permiso para editarla"
+    )
+    try:
+        oid = ObjectId(prenda_id)
+    except (InvalidId, TypeError):
+        raise no_encontrada
+
+    cambios["editado_por_usuario"] = True
+    cambios["editado_en"] = datetime.utcnow()
+
+    prenda = await db.prendas.find_one_and_update(
+        {"_id": oid, "usuario_id": ObjectId(usuario_id), "activa": True},
+        {"$set": cambios},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not prenda:
+        raise no_encontrada
+
+    logger.info(f"✏️ Prenda editada por el usuario: {prenda_id} ({', '.join(k for k in cambios if k not in ('editado_por_usuario', 'editado_en'))})")
+
+    return {
+        "success": True,
+        "prenda": PrendaModel.serializar(prenda)
     }
 
 
