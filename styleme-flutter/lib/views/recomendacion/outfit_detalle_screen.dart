@@ -269,7 +269,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
         children: [
           _scoreItem('Co-ocurrencia', detalle['coocurrencia'] ?? 0, 'x0.5'),
           _scoreItem('Color', detalle['color'] ?? 0, 'x0.3'),
-          _scoreItem('Día/noche', detalle['momento'] ?? detalle['temporada'] ?? 0, 'x0.2'),
+          _scoreItem('Clima', detalle['momento'] ?? detalle['temporada'] ?? 0, 'x0.2'),
         ].map((w) => Expanded(child: w)).toList(),
       ),
     );

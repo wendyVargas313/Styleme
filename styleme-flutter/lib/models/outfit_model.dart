@@ -1,4 +1,5 @@
 // StyleMe - Modelo de datos para Outfit
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/models/prenda_model.dart';
 
 class ComplementoOutfit {
@@ -56,7 +57,7 @@ class OutfitModel {
           : null,
       complementos: complementos,
       feedback: json['feedback'] ?? 'none',
-      momento: json['momento'] as String?,
+      momento: AppConstants.normalizarMomento(json['momento'] as String?),
       tipoGeneracion: json['tipo_generacion'] ?? 'manual',
       generadoEn: json['generado_en'] ?? '',
     );

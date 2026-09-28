@@ -1,4 +1,6 @@
 // StyleMe - Modelo de datos para Prenda
+import 'package:styleme/config/constants.dart';
+
 class PrendaModel {
   final String id;
   final String tipo;
@@ -29,7 +31,8 @@ class PrendaModel {
       id: json['id']?.toString() ?? '',
       tipo: json['tipo'] ?? '',
       color: json['color'] ?? '',
-      momento: json['momento'] ?? 'ambos',
+      momento: AppConstants.normalizarMomento(json['momento'] as String?) ??
+          AppConstants.momentoDefault,
       confianzaYolo: (json['confianza_yolo'] ?? 0.0).toDouble(),
       imagenUrl: json['imagen_url'] ?? '',
       notas: json['notas'] ?? '',

@@ -126,7 +126,7 @@ class DetallePrendaScreen extends StatelessWidget {
                   ('Tipo detectado', prenda.tipo),
                   ('Color predominante', prenda.color),
                   ('Confianza ML', prenda.confianzaTexto),
-                  ('Momento', AppConstants.etiquetaMomento(prenda.momento)),
+                  ('Clima', AppConstants.etiquetaMomento(prenda.momento)),
                   ('Agregada', _formatearFecha(prenda.creadoEn)),
                 ]),
 

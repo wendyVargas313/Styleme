@@ -95,14 +95,14 @@ class _RecomendacionScreenState extends State<RecomendacionScreen> {
 
               const SizedBox(height: 24),
 
-              // Selector de momento (null = "Cualquiera": no filtra)
+              // Selector de clima (null = "Cualquiera": no filtra)
               Text(
-                'Momento',
+                'Clima',
                 style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 10),
               Row(
-                children: <String?>[null, 'dia', 'noche'].map((m) {
+                children: <String?>[null, ...AppConstants.momentosSeleccionables].map((m) {
                   final sel = m == _momentoSeleccionado;
                   final icono = m == null ? '🔀' : AppConstants.iconoMomento(m);
                   final etiqueta = m == null ? 'Cualquiera' : AppConstants.etiquetaMomento(m);

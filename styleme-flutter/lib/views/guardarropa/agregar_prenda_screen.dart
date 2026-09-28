@@ -8,6 +8,7 @@ import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
 import 'package:styleme/services/image_service.dart';
 import 'package:styleme/widgets/custom_button.dart';
+import 'package:styleme/widgets/momento_selector.dart';
 
 const _maxFotos = 10;
 
@@ -90,11 +91,12 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen> {
     setState(() => foto.seleccionada = !foto.seleccionada);
   }
 
+  // La selección se conserva: el selector tiene dos chips independientes y
+  // pasar de un valor a otro puede requerir más de un toque.
   void _asignarMomento(String momento) {
     setState(() {
-      for (final f in _seleccionadas.toList()) {
+      for (final f in _seleccionadas) {
         f.momento = momento;
-        f.seleccionada = false;
       }
     });
   }
@@ -310,8 +312,9 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen> {
           ],
           const SizedBox(height: 14),
           Text(
-            'Toca las fotos para seleccionarlas y marcarlas como Día o Noche. '
-            'Las que no marques quedan en Ambos.',
+            'Toca las fotos para seleccionarlas y marcar con qué clima se '
+            'usan. Si no las cambias, quedan como '
+            '${AppConstants.etiquetaMomento(AppConstants.momentoDefault)}.',
             style: GoogleFonts.poppins(
                 color: StyleMeTheme.textPrimary, fontSize: 12),
           ),
@@ -461,27 +464,14 @@ class _AgregarPrendaScreenState extends State<AgregarPrendaScreen> {
   Widget _buildBarraSeleccion() {
     final editables = _fotos.where((f) => f.editable).length;
     final todasSeleccionadas = _seleccionadas.length == editables;
+    final valores = _seleccionadas.map((f) => f.momento).toSet();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            for (final (momento, texto) in const [
-              ('dia', '☀️ Día'),
-              ('noche', '🌙 Noche'),
-              ('ambos', '🔄 Ambos'),
-            ])
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: OutlinedButton(
-                    onPressed: () => _asignarMomento(momento),
-                    child: Text(texto,
-                        style: GoogleFonts.poppins(fontSize: 12)),
-                  ),
-                ),
-              ),
-          ],
+        MomentoSelector(
+          valor: valores.length == 1 ? valores.first : AppConstants.momentoDefault,
+          mixto: valores.length > 1,
+          onChanged: _asignarMomento,
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -668,13 +658,15 @@ class _Insignia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ancho mínimo 24 (círculo); se estira para el ícono doble ☀️🌧️.
     return Container(
-      width: 24,
       height: 24,
+      constraints: const BoxConstraints(minWidth: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.6),
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: child,
     );

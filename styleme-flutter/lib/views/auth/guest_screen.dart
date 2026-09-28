@@ -13,6 +13,7 @@ import 'package:styleme/services/api_service.dart';
 import 'package:styleme/services/image_service.dart';
 import 'package:styleme/widgets/custom_button.dart';
 import 'package:styleme/widgets/loading_widget.dart';
+import 'package:styleme/widgets/momento_selector.dart';
 import 'package:styleme/widgets/outfit_visual_card.dart';
 
 class GuestScreen extends StatefulWidget {
@@ -206,7 +207,7 @@ class _GuestScreenState extends State<GuestScreen> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Momento',
+          'Clima',
           style: GoogleFonts.poppins(
             color: StyleMeTheme.textSecondary,
             fontSize: 13,
@@ -214,24 +215,9 @@ class _GuestScreenState extends State<GuestScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: AppConstants.momentos.map((m) {
-            final sel = m == _momentoSeleccionado;
-            return ChoiceChip(
-              label: Text(
-                '${AppConstants.iconoMomento(m)} ${AppConstants.etiquetaMomento(m)}',
-                style: GoogleFonts.poppins(
-                  color: sel ? Colors.white : StyleMeTheme.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-              selected: sel,
-              selectedColor: StyleMeTheme.primary,
-              backgroundColor: StyleMeTheme.card,
-              onSelected: (_) => setState(() => _momentoSeleccionado = m),
-            );
-          }).toList(),
+        MomentoSelector(
+          valor: _momentoSeleccionado,
+          onChanged: (m) => setState(() => _momentoSeleccionado = m),
         ),
         const SizedBox(height: 28),
         CustomButton(

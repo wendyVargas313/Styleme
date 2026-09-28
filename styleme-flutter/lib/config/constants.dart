@@ -4,30 +4,44 @@ class AppConstants {
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
 
-  // Momentos disponibles para una prenda: cuándo conviene usarla
-  static const List<String> momentos = ['dia', 'noche', 'ambos'];
+  // Momento de una prenda = clima para el que sirve. 'ambos' es un valor
+  // interno (prenda versátil): en la UI se marca con los dos chips.
+  static const List<String> momentos = ['soleado', 'lluvioso', 'ambos'];
   static const String momentoDefault = 'ambos';
+  static const List<String> momentosSeleccionables = ['soleado', 'lluvioso'];
 
   static const Map<String, String> momentoIconos = {
-    'dia': '☀️',
-    'noche': '🌙',
-    'ambos': '🔄',
+    'soleado': '☀️',
+    'lluvioso': '🌧️',
+    'ambos': '☀️🌧️',
   };
 
   static const Map<String, String> momentoEtiquetas = {
-    'dia': 'Día',
-    'noche': 'Noche',
-    'ambos': 'Ambos',
+    'soleado': 'Soleado',
+    'lluvioso': 'Lluvioso',
+    'ambos': 'Soleado y lluvioso',
   };
+
+  static const Map<String, String> _momentosLegado = {
+    'dia': 'soleado',
+    'noche': 'lluvioso',
+  };
+
+  // Valor vigente del momento (acepta el legado dia/noche); null si no se
+  // reconoce.
+  static String? normalizarMomento(String? momento) {
+    if (momentos.contains(momento)) return momento;
+    return _momentosLegado[momento];
+  }
 
   // Ícono para un momento; tolerante a null o valores desconocidos.
   static String iconoMomento(String? momento) {
-    return momentoIconos[momento] ?? '🔄';
+    return momentoIconos[normalizarMomento(momento) ?? momentoDefault]!;
   }
 
   // Etiqueta legible para un momento; tolerante a null o valores desconocidos.
   static String etiquetaMomento(String? momento) {
-    return momentoEtiquetas[momento] ?? 'Ambos';
+    return momentoEtiquetas[normalizarMomento(momento) ?? momentoDefault]!;
   }
 
   // Opciones de género

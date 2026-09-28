@@ -150,7 +150,7 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: AppConstants.momentos.length + 1,
+            itemCount: AppConstants.momentosSeleccionables.length + 1,
             itemBuilder: (_, i) {
               if (i == 0) {
                 final activo = ctrl.filtroMomento == null;
@@ -167,7 +167,8 @@ class _GuardarropaScreenState extends State<GuardarropaScreen> {
                   ),
                 );
               }
-              final m = AppConstants.momentos[i - 1];
+              // El backend incluye las versátiles en ambos filtros.
+              final m = AppConstants.momentosSeleccionables[i - 1];
               final activo = ctrl.filtroMomento == m;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),

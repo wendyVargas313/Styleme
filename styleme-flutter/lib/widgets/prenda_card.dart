@@ -103,7 +103,9 @@ class PrendaCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      _chip(prenda.color, StyleMeTheme.primary.withValues(alpha: 0.2)),
+                      Flexible(
+                        child: _chip(prenda.color, StyleMeTheme.primary.withValues(alpha: 0.2)),
+                      ),
                       const SizedBox(width: 4),
                       _chip(AppConstants.iconoMomento(prenda.momento), StyleMeTheme.card),
                     ],
@@ -146,6 +148,8 @@ class PrendaCard extends StatelessWidget {
       ),
       child: Text(
         texto,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: GoogleFonts.poppins(
           color: StyleMeTheme.textPrimary,
           fontSize: 10,

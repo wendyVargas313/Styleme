@@ -1,6 +1,7 @@
 // StyleMe - Controller de Recomendaciones (Provider)
 import 'package:flutter/foundation.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/controllers/mixins/recarga_inteligente.dart';
 import 'package:styleme/models/outfit_ia_model.dart';
 import 'package:styleme/models/outfit_model.dart';
@@ -116,8 +117,9 @@ class RecomendacionController extends ChangeNotifier with RecargaInteligente {
   }
 
   String _mensajeSinCandidatos(String? momento) {
-    if (momento == 'dia') return 'No tienes suficientes prendas de día para armar un outfit';
-    if (momento == 'noche') return 'No tienes suficientes prendas de noche para armar un outfit';
+    final normalizado = AppConstants.normalizarMomento(momento);
+    if (normalizado == 'soleado') return 'No tienes suficientes prendas para clima soleado';
+    if (normalizado == 'lluvioso') return 'No tienes suficientes prendas para clima lluvioso';
     return 'No tienes suficientes prendas compatibles para armar un outfit';
   }
 
