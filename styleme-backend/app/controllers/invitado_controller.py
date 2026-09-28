@@ -11,6 +11,7 @@ from typing import List
 
 from app.ml.ml_agent import ml_agent
 from app.ml.recommender import RecomendadorOutfits
+from app.models.momento import MOMENTOS_VALIDOS, normalizar_momento
 from app.services.imagen_service import normalizar_orientacion
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,13 @@ async def probar_como_invitado(
     Returns:
         dict con prendas_detectadas y outfit_prueba
     """
+    momento = normalizar_momento(momento)
+    if momento is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
+        )
+
     # Verificar límite de uso por dispositivo
     ahora = datetime.utcnow()
     registro_existente = await db.invitados.find_one({

@@ -24,7 +24,7 @@ def test_completo():
             f"{BASE}/guardarropa/agregar",
             headers=h,
             files={"imagen": ("camiseta.jpg", img, "image/jpeg")},
-            data={"momento": "noche", "notas": "Prueba ML pipeline"}
+            data={"momento": "lluvioso", "notas": "Prueba ML pipeline"}
         )
 
     prenda = r.json()["prenda"]
@@ -39,7 +39,7 @@ def test_completo():
     # 3. Agregar 2 prendas más para tener variedad
     tipos_extra = [
         ("test_camiseta.jpg", "ambos"),
-        ("test_camiseta.jpg", "dia"),
+        ("test_camiseta.jpg", "soleado"),
     ]
     ids_extra = []
     for img_path, momento in tipos_extra:
@@ -66,7 +66,7 @@ def test_completo():
     r = requests.post(
         f"{BASE}/recomendar/outfit",
         headers=h,
-        json={"prenda_id": prenda_id, "momento": "noche", "top_k": 3}
+        json={"prenda_id": prenda_id, "momento": "lluvioso", "top_k": 3}
     )
     outfit = r.json()
     print(f"\n[OK] Outfit generado:")
@@ -93,7 +93,7 @@ def test_completo():
     print(f"[OK] Historial: {hist['total']} outfits guardados")
 
     # 8. Outfits del día
-    r = requests.get(f"{BASE}/recomendar/diario?momento=noche", headers=h)
+    r = requests.get(f"{BASE}/recomendar/diario?momento=lluvioso", headers=h)
     diario = r.json()
     print(f"[OK] Outfits del dia: {diario.get('total_outfits', 0)} generados")
 

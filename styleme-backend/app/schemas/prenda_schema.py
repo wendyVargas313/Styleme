@@ -2,19 +2,20 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 
-from app.models.momento import MOMENTOS_VALIDOS, MOMENTO_DEFAULT
+from app.models.momento import MOMENTOS_VALIDOS, MOMENTO_DEFAULT, normalizar_momento
 
 
 class AgregarPrendaRequest(BaseModel):
     """Schema para agregar una prenda (datos del form junto a la imagen)."""
-    momento: str = Field(MOMENTO_DEFAULT, description="Momento: dia/noche/ambos")
+    momento: str = Field(MOMENTO_DEFAULT, description="Momento: soleado/lluvioso/ambos")
     notas: Optional[str] = Field("", max_length=500, description="Notas opcionales")
 
     @validator("momento")
     def validar_momento(cls, v):
-        if v not in MOMENTOS_VALIDOS:
+        normalizado = normalizar_momento(v)
+        if normalizado is None:
             raise ValueError(f"Momento debe ser uno de: {MOMENTOS_VALIDOS}")
-        return v
+        return normalizado
 
 
 class PrendaResponse(BaseModel):

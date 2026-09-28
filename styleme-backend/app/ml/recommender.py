@@ -59,7 +59,8 @@ class RecomendadorOutfits:
         """
         Calcula compatibilidad entre dos momentos.
         1.0 si son iguales o si alguno de los dos es "ambos" (versátil,
-        compatible con cualquier otro); 0.0 si uno es "dia" y el otro "noche".
+        compatible con cualquier otro); 0.0 si uno es "soleado" y el otro
+        "lluvioso".
         """
         if m1 == m2 or m1 == "ambos" or m2 == "ambos":
             return 1.0

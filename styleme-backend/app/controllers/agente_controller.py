@@ -94,7 +94,11 @@ async def recomendar_para_evento(
         mensajes=mensajes,
         json_mode=True,
         temperatura=0.5,
-        max_tokens=1024,
+        # 2048: con modelos de razonamiento (gpt-oss/qwen) los tokens de
+        # razonamiento comparten el mismo presupuesto que la respuesta final;
+        # 1024 alcanzaba justo para el JSON (~300-450 tokens para 3 outfits +
+        # notas) sin dejar margen para el razonamiento previo.
+        max_tokens=2048,
     )
 
     outfits_validos, descartados = prompt_agente.validar_outfits(

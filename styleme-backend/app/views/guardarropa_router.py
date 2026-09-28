@@ -22,7 +22,7 @@ async def agregar(
     imagen_sin_fondo: Optional[UploadFile] = File(
         None, description="Recorte PNG con transparencia hecho en el dispositivo (opcional)"
     ),
-    momento: str = Form(MOMENTO_DEFAULT, description="dia/noche/ambos"),
+    momento: str = Form(MOMENTO_DEFAULT, description="soleado/lluvioso/ambos"),
     notas: Optional[str] = Form("", description="Notas opcionales sobre la prenda"),
     usuario_actual=Depends(get_usuario_actual),
     db=Depends(get_db)

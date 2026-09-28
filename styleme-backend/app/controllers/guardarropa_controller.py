@@ -16,7 +16,13 @@ from fastapi.concurrency import run_in_threadpool
 from app.config.database import get_db
 from app.config.settings import settings
 from app.models.prenda_model import PrendaModel
-from app.models.momento import MOMENTOS_VALIDOS, MAPEO_TEMPORADA_A_MOMENTO, MOMENTO_DEFAULT, momento_de_prenda
+from app.models.momento import (
+    MOMENTOS_VALIDOS,
+    MAPEO_TEMPORADA_A_MOMENTO,
+    MOMENTO_DEFAULT,
+    momento_de_prenda,
+    normalizar_momento,
+)
 from app.ml.ml_agent import ml_agent, ml_lock
 from app.services.imagen_service import normalizar_orientacion
 
@@ -231,7 +237,8 @@ async def agregar_prenda(
     Returns:
         dict con éxito y datos de la prenda detectada
     """
-    if momento not in MOMENTOS_VALIDOS:
+    momento = normalizar_momento(momento)
+    if momento is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
@@ -344,24 +351,30 @@ async def listar_prendas(
     if color:
         filtro["color"] = color
     if momento:
-        if momento not in MOMENTOS_VALIDOS:
+        momento_normalizado = normalizar_momento(momento)
+        if momento_normalizado is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
             )
+        # Las prendas "ambos" (versátiles) aparecen en cualquier filtro de
+        # soleado/lluvioso, además de en el filtro "ambos".
+        momentos_objetivo = {momento_normalizado, MOMENTO_DEFAULT}
+
         # Prendas ya migradas: coincidencia directa por "momento".
         # Prendas sin migrar (solo tienen "temporada"): se incluyen si su
-        # temporada mapea al momento pedido (MAPEO_TEMPORADA_A_MOMENTO).
+        # temporada mapea a alguno de los momentos objetivo (MAPEO_TEMPORADA_A_MOMENTO).
         temporadas_legacy = [
-            t for t, m in MAPEO_TEMPORADA_A_MOMENTO.items() if m == momento
+            t for t, m in MAPEO_TEMPORADA_A_MOMENTO.items() if m in momentos_objetivo
         ]
         or_clauses = [
-            {"momento": momento},
+            {"momento": {"$in": list(momentos_objetivo)}},
             {"momento": {"$exists": False}, "temporada": {"$in": temporadas_legacy}}
         ]
         # Prendas sin "momento" ni "temporada" (dato incompleto): caen al
-        # default, así que solo aparecen cuando se filtra por MOMENTO_DEFAULT.
-        if momento == MOMENTO_DEFAULT:
+        # default, así que solo aparecen cuando el default está entre los
+        # momentos objetivo (siempre, dado que MOMENTO_DEFAULT = "ambos").
+        if MOMENTO_DEFAULT in momentos_objetivo:
             or_clauses.append({"momento": {"$exists": False}, "temporada": {"$exists": False}})
         filtro["$or"] = or_clauses
 

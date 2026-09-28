@@ -31,7 +31,11 @@ class Settings:
 
     # Agente IA
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    # Se usa si GROQ_MODEL responde 404/model_decommissioned (modelo retirado de Groq).
+    GROQ_MODEL_FALLBACK: str = os.getenv("GROQ_MODEL_FALLBACK", "qwen/qwen3.8-27b")
+    # Solo aplica a modelos openai/gpt-oss-*; admite low/medium/high (no "none").
+    GROQ_REASONING_EFFORT: str = os.getenv("GROQ_REASONING_EFFORT", "low")
     OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
 
     # API

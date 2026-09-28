@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.config.database import get_db
 from app.middleware.auth_middleware import get_usuario_actual
-from app.models.momento import MOMENTOS_VALIDOS
+from app.models.momento import MOMENTOS_VALIDOS, normalizar_momento
 from app.schemas.outfit_schema import RecomendarOutfitRequest
 from app.controllers.recomendacion_controller import (
     recomendar_outfit,
@@ -13,12 +13,17 @@ from app.controllers.recomendacion_controller import (
 )
 
 
-def _validar_momento_query(momento: Optional[str]) -> None:
-    if momento is not None and momento not in MOMENTOS_VALIDOS:
+def _validar_momento_query(momento: Optional[str]) -> Optional[str]:
+    """Normaliza (legado dia/noche aceptado) y valida el momento de query param."""
+    if momento is None:
+        return None
+    momento_normalizado = normalizar_momento(momento)
+    if momento_normalizado is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Momento debe ser uno de: {MOMENTOS_VALIDOS}"
         )
+    return momento_normalizado
 
 router = APIRouter(prefix="/recomendar", tags=["Recomendaciones"])
 
@@ -53,7 +58,7 @@ async def diario(
     Genera los 3 outfits del día automáticamente.
     Prioriza prendas menos usadas del guardarropa.
     """
-    _validar_momento_query(momento)
+    momento = _validar_momento_query(momento)
     usuario_id = str(usuario_actual["_id"])
     return await obtener_outfits_diarios(
         momento=momento,
@@ -73,7 +78,7 @@ async def outfits_ia(
     con la foto de perfil del usuario para producir la imagen IA.
     Requiere que el usuario haya subido su foto de perfil.
     """
-    _validar_momento_query(momento)
+    momento = _validar_momento_query(momento)
     return await generar_outfits_ia(
         usuario=usuario_actual,
         momento=momento,

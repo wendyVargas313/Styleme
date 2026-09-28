@@ -9,17 +9,17 @@ a correr la verificación.
 
 from app.models.momento import momento_de_prenda
 
-# Umbrales para decidir qué momentos ("dia"/"noche"/"ambos") son apropiados
-# según el clima esperado del evento (ver filtrar_prendas).
-UMBRAL_CALOR_MAX = 22   # temp_max >= esto -> permite "dia"
-UMBRAL_FRIO_MAX = 16    # temp_max <= esto -> permite "noche"
+# Umbrales para decidir qué momentos ("soleado"/"lluvioso"/"ambos") son
+# apropiados según el clima esperado del evento (ver filtrar_prendas).
+UMBRAL_CALOR_MAX = 22   # temp_max >= esto -> permite "soleado"
+UMBRAL_FRIO_MAX = 16    # temp_max <= esto -> permite "lluvioso"
 UMBRAL_LLUVIA_MM = 1.0
 UMBRAL_DIAS_LLUVIA_PCT = 50
 PALABRAS_LLUVIA = ("lluvia", "llovizna", "tormenta", "chubasco", "aguacero")
 
 LEYENDA_MOMENTO = (
-    "momento: dia = ropa fresca para calor, noche = ropa abrigada para frio "
-    "o lluvia, ambos = sirve en los dos casos"
+    "momento: soleado = ropa fresca para dia soleado o calor, lluvioso = "
+    "ropa abrigada para frio o lluvia, ambos = sirve en los dos casos"
 )
 
 SYSTEM_PROMPT = """Eres un asesor de vestuario. Recomiendas outfits usando UNICAMENTE las
@@ -81,9 +81,9 @@ GUARDARROPA
 
 def _momentos_permitidos(clima: dict) -> set[str] | None:
     """
-    Decide qué momentos ("dia"/"noche"/"ambos") son apropiados para el clima
-    esperado del evento. Devuelve None si no hay que filtrar por momento
-    (clima intermedio y sin señales de lluvia).
+    Decide qué momentos ("soleado"/"lluvioso"/"ambos") son apropiados para
+    el clima esperado del evento. Devuelve None si no hay que filtrar por
+    momento (clima intermedio y sin señales de lluvia).
     """
     temp_max = clima.get("temp_max")
     precipitacion_mm = clima.get("precipitacion_mm") or 0
@@ -97,11 +97,11 @@ def _momentos_permitidos(clima: dict) -> set[str] | None:
     )
 
     if hay_lluvia:
-        return {"noche", "ambos"}
+        return {"lluvioso", "ambos"}
     if temp_max is not None and temp_max >= UMBRAL_CALOR_MAX:
-        return {"dia", "ambos"}
+        return {"soleado", "ambos"}
     if temp_max is not None and temp_max <= UMBRAL_FRIO_MAX:
-        return {"noche", "ambos"}
+        return {"lluvioso", "ambos"}
     return None
 
 
@@ -109,9 +109,10 @@ def filtrar_prendas(prendas: list[dict], clima: dict, limite: int = 40) -> list[
     """
     Reduce el guardarropa a las prendas más relevantes para el clima, capado a `limite`.
 
-    El clima decide qué momentos ("dia"/"noche"/"ambos") son apropiados (ver
-    _momentos_permitidos): lluvia -> noche/ambos; calor sin lluvia -> dia/ambos;
-    frío sin lluvia -> noche/ambos; clima intermedio y seco -> no se filtra.
+    El clima decide qué momentos ("soleado"/"lluvioso"/"ambos") son apropiados
+    (ver _momentos_permitidos): lluvia -> lluvioso/ambos; calor sin lluvia ->
+    soleado/ambos; frío sin lluvia -> lluvioso/ambos; clima intermedio y seco
+    -> no se filtra.
     El resultado se ordena por veces_usado descendente y se capa a `limite`.
 
     Si el filtro por momento deja menos de 3 prendas, se descarta el filtro
