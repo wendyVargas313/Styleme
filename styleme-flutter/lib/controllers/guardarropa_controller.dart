@@ -23,17 +23,45 @@ enum TipoErrorSubida {
   deLaFoto,
 }
 
+// Resultado de un borrado múltiple en serie.
+class ResultadoEliminacion {
+  final List<String> eliminadas;
+  final List<String> fallidas;
+  // Se detuvo por falta de conexión: las que no se intentaron no están en
+  // ninguna de las dos listas.
+  final bool conexionPerdida;
+
+  const ResultadoEliminacion({
+    required this.eliminadas,
+    required this.fallidas,
+    required this.conexionPerdida,
+  });
+}
+
 class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   final ApiService _api = ApiService();
+
+  // Máximo que acepta el backend por página.
+  static const int _limite = 50;
 
   GuardarropaEstado _estado = GuardarropaEstado.inicial;
   List<PrendaModel> _prendas = [];
   Map<String, dynamic> _stats = {};
+  Map<String, int> _conteoPorTipo = {};
   String? _mensajeError;
   TipoErrorSubida? _ultimoErrorSubida;
   int _totalPrendas = 0;
-  int _paginaActual = 1;
   bool _ultimoRefrescoFallo = false;
+
+  bool _cargandoMas = false;
+  bool _errorCargarMas = false;
+  // Una página no trajo nada nuevo aunque total dijera que faltaban: se deja
+  // de pedir para no entrar en un ciclo.
+  bool _finForzado = false;
+  Future<void>? _cargaMasEnCurso;
+  // Cada recarga desde la página 1 invalida las respuestas en vuelo de
+  // cargas anteriores (filtro cambiado a mitad de una petición).
+  int _generacion = 0;
 
   // Filtros activos
   String? _filtroTipo;
@@ -50,51 +78,71 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
   String? get filtroColor => _filtroColor;
   String? get filtroMomento => _filtroMomento;
   bool get ultimoRefrescoFallo => _ultimoRefrescoFallo;
+  bool get cargandoMas => _cargandoMas;
+  bool get errorCargarMas => _errorCargarMas;
+  bool get hayMas => !_finForzado && _prendas.length < _totalPrendas;
+
+  // Tipos que el usuario tiene (todo el armario, sin filtros), de más a
+  // menos prendas.
+  List<MapEntry<String, int>> get tiposConConteo {
+    final tipos = _conteoPorTipo.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value != a.value
+          ? b.value.compareTo(a.value)
+          : a.key.compareTo(b.key));
+    return tipos;
+  }
+
+  int conteoDeTipo(String tipo) => _conteoPorTipo[tipo] ?? 0;
 
   // Recarga solo si hace falta (nunca cargó, la última falló, o pasaron
   // más de 30s). Pensado para disparadores pasivos: cambio de pestaña,
   // vuelta a primer plano. Si ya hay una carga en curso, no dispara otra.
-  // Siempre pide resetear:true (página 1) para no arrastrar una página
-  // vieja si en el futuro se agrega scroll infinito.
   Future<void> refrescarSiHaceFalta() async {
     if (_estado == GuardarropaEstado.cargando) return;
     if (haceFaltaRecargar) await cargarPrendas(resetear: true);
   }
 
-  // Cargar prendas del guardarropa
-  Future<void> cargarPrendas({bool resetear = false}) async {
-    if (resetear) {
-      _paginaActual = 1;
-    }
+  Future<Map<String, dynamic>> _pedirPagina(int pagina) async {
+    final queryParams = <String, dynamic>{
+      'page': pagina,
+      'limit': _limite,
+    };
+    if (_filtroTipo != null) queryParams['tipo'] = _filtroTipo;
+    if (_filtroColor != null) queryParams['color'] = _filtroColor;
+    if (_filtroMomento != null) queryParams['momento'] = _filtroMomento;
 
+    final response = await _api.get(
+      ApiConfig.listarPrendas,
+      queryParams: queryParams,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  // Carga la página 1 y reemplaza la lista (el scroll infinito sigue con
+  // cargarMas). `resetear` se conserva por compatibilidad de llamadas: esta
+  // carga siempre empieza de cero.
+  Future<void> cargarPrendas({bool resetear = true}) async {
+    final generacion = ++_generacion;
     final huboDatosPrevios = _prendas.isNotEmpty;
     _estado = GuardarropaEstado.cargando;
     _mensajeError = null;
+    _cargandoMas = false;
+    _errorCargarMas = false;
     notifyListeners();
 
     try {
-      final queryParams = <String, dynamic>{
-        'page': _paginaActual,
-        'limit': 20,
-      };
-      if (_filtroTipo != null) queryParams['tipo'] = _filtroTipo;
-      if (_filtroColor != null) queryParams['color'] = _filtroColor;
-      if (_filtroMomento != null) queryParams['momento'] = _filtroMomento;
-
-      final response = await _api.get(
-        ApiConfig.listarPrendas,
-        queryParams: queryParams,
-      );
-
-      final data = response.data as Map<String, dynamic>;
+      final data = await _pedirPagina(1);
+      if (generacion != _generacion) return;
       final prendasJson = data['prendas'] as List? ?? [];
       // Solo se reemplaza la lista si la respuesta fue exitosa.
       _prendas = prendasJson.map((p) => PrendaModel.fromJson(p)).toList();
       _totalPrendas = data['total'] ?? 0;
+      _finForzado = false;
       _estado = GuardarropaEstado.listo;
       _ultimoRefrescoFallo = false;
       registrarCargaExitosa();
     } catch (e) {
+      if (generacion != _generacion) return;
       registrarCargaFallida();
       _mensajeError = 'Error cargando prendas';
       if (huboDatosPrevios) {
@@ -108,6 +156,59 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
       }
     }
     notifyListeners();
+  }
+
+  // Siguiente página del scroll infinito. Si ya hay una en curso, devuelve
+  // esa misma. Si falla, conserva lo cargado y deja errorCargarMas para que
+  // la UI ofrezca reintentar.
+  Future<void> cargarMas() {
+    final enCurso = _cargaMasEnCurso;
+    if (enCurso != null) return enCurso;
+    if (!hayMas || _estado == GuardarropaEstado.cargando) return Future.value();
+    final carga = _cargarMas();
+    _cargaMasEnCurso = carga;
+    return carga.whenComplete(() => _cargaMasEnCurso = null);
+  }
+
+  Future<void> _cargarMas() async {
+    final generacion = _generacion;
+    _cargandoMas = true;
+    _errorCargarMas = false;
+    notifyListeners();
+
+    try {
+      // La página se deriva de lo ya cargado, no de un contador: tras borrar
+      // prendas el backend corre sus offsets, y pedir la página que contiene
+      // el siguiente índice (deduplicando) evita saltarse prendas.
+      final data = await _pedirPagina(_prendas.length ~/ _limite + 1);
+      if (generacion != _generacion) return;
+      final ids = _prendas.map((p) => p.id).toSet();
+      final nuevas = (data['prendas'] as List? ?? [])
+          .map((p) => PrendaModel.fromJson(p))
+          .where((p) => !ids.contains(p.id))
+          .toList();
+      _prendas = [..._prendas, ...nuevas];
+      _totalPrendas = data['total'] ?? _totalPrendas;
+      if (nuevas.isEmpty) _finForzado = true;
+    } catch (_) {
+      if (generacion != _generacion) return;
+      _errorCargarMas = true;
+    }
+    _cargandoMas = false;
+    notifyListeners();
+  }
+
+  // Carga todas las páginas que falten. Devuelve false si alguna falló o si
+  // la lista se recargó mientras tanto.
+  Future<bool> cargarTodas() async {
+    final generacion = _generacion;
+    while (hayMas) {
+      final antes = _prendas.length;
+      await cargarMas();
+      if (generacion != _generacion || _errorCargarMas) return false;
+      if (_prendas.length == antes && hayMas) return false;
+    }
+    return generacion == _generacion;
   }
 
   // Agregar prenda con imagen.
@@ -163,6 +264,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
         final nuevaPrenda = PrendaModel.fromJson(data['prenda']);
         _prendas.insert(0, nuevaPrenda);
         _totalPrendas++;
+        _conteoPorTipo[nuevaPrenda.tipo] = conteoDeTipo(nuevaPrenda.tipo) + 1;
         if (notificar) {
           _estado = GuardarropaEstado.listo;
           notifyListeners();
@@ -172,7 +274,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
       _registrarErrorSubida(
           TipoErrorSubida.deLaFoto, 'Error al agregar la prenda', notificar);
     } catch (e) {
-      final tipo = _clasificarErrorSubida(e);
+      final tipo = _clasificarError(e);
       _registrarErrorSubida(tipo, _parsearError(e, tipo), notificar);
     }
     return null;
@@ -188,7 +290,7 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     }
   }
 
-  TipoErrorSubida _clasificarErrorSubida(Object e) {
+  TipoErrorSubida _clasificarError(Object e) {
     if (e is SocketException) return TipoErrorSubida.conexion;
     if (e is! DioException) return TipoErrorSubida.deLaFoto;
     switch (e.type) {
@@ -207,12 +309,26 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     }
   }
 
+  // Quita una prenda ya borrada en el backend de la lista local, sin recargar.
+  void _quitarLocal(String prendaId) {
+    final idx = _prendas.indexWhere((p) => p.id == prendaId);
+    if (idx != -1) {
+      final tipo = _prendas.removeAt(idx).tipo;
+      final restante = conteoDeTipo(tipo) - 1;
+      if (restante > 0) {
+        _conteoPorTipo[tipo] = restante;
+      } else {
+        _conteoPorTipo.remove(tipo);
+      }
+    }
+    _totalPrendas = (_totalPrendas - 1).clamp(0, 9999);
+  }
+
   // Eliminar prenda
   Future<bool> eliminarPrenda(String prendaId) async {
     try {
       await _api.delete(ApiConfig.eliminarPrenda(prendaId));
-      _prendas.removeWhere((p) => p.id == prendaId);
-      _totalPrendas = (_totalPrendas - 1).clamp(0, 9999);
+      _quitarLocal(prendaId);
       notifyListeners();
       return true;
     } catch (_) {
@@ -220,28 +336,63 @@ class GuardarropaController extends ChangeNotifier with RecargaInteligente {
     }
   }
 
-  // Cargar estadísticas
+  // Borra en serie, una por una, con el DELETE individual. Si una falla por
+  // un error propio (404, 500…) sigue con las demás; si se pierde la
+  // conexión, se detiene. `alAvanzar` recibe (actual, total) antes de cada
+  // petición.
+  Future<ResultadoEliminacion> eliminarVarias(
+    List<String> ids, {
+    void Function(int actual, int total)? alAvanzar,
+  }) async {
+    final eliminadas = <String>[];
+    final fallidas = <String>[];
+    var conexionPerdida = false;
+
+    for (var i = 0; i < ids.length; i++) {
+      alAvanzar?.call(i + 1, ids.length);
+      try {
+        await _api.delete(ApiConfig.eliminarPrenda(ids[i]));
+        _quitarLocal(ids[i]);
+        eliminadas.add(ids[i]);
+        notifyListeners();
+      } catch (e) {
+        // receiveTimeout (sinConfirmar) también cuenta como conexión: el
+        // servidor no confirmó y seguir solo acumularía más dudas.
+        if (_clasificarError(e) != TipoErrorSubida.deLaFoto) {
+          conexionPerdida = true;
+          break;
+        }
+        fallidas.add(ids[i]);
+      }
+    }
+
+    return ResultadoEliminacion(
+      eliminadas: eliminadas,
+      fallidas: fallidas,
+      conexionPerdida: conexionPerdida,
+    );
+  }
+
+  // Estadísticas del armario; de aquí sale también el conteo por tipo de
+  // los chips. Si falla, se conserva lo anterior.
   Future<void> cargarStats() async {
     try {
       final response = await _api.get(ApiConfig.statsGuardarropa);
       _stats = response.data as Map<String, dynamic>;
+      final porTipo = _stats['por_tipo'] as Map? ?? {};
+      _conteoPorTipo = {
+        for (final e in porTipo.entries)
+          e.key.toString(): (e.value as num).toInt(),
+      };
       notifyListeners();
     } catch (_) {}
   }
 
-  // Aplicar filtro
+  // Aplicar filtro (reinicia en la página 1)
   void aplicarFiltros({String? tipo, String? color, String? momento}) {
     _filtroTipo = tipo;
     _filtroColor = color;
     _filtroMomento = momento;
-    cargarPrendas(resetear: true);
-  }
-
-  // Limpiar filtros
-  void limpiarFiltros() {
-    _filtroTipo = null;
-    _filtroColor = null;
-    _filtroMomento = null;
     cargarPrendas(resetear: true);
   }
 

@@ -97,7 +97,7 @@ class DetallePrendaScreen extends StatelessWidget {
               delegate: SliverChildListDelegate([
                 // Nombre del tipo
                 Text(
-                  prenda.tipo,
+                  AppConstants.etiquetaTipo(prenda.tipo),
                   style: GoogleFonts.poppins(
                     color: StyleMeTheme.textPrimary,
                     fontSize: 26,
@@ -123,7 +123,7 @@ class DetallePrendaScreen extends StatelessWidget {
 
                 // Detalles adicionales
                 _infoCard('Información de detección', [
-                  ('Tipo detectado', prenda.tipo),
+                  ('Tipo detectado', AppConstants.etiquetaTipo(prenda.tipo)),
                   ('Color predominante', prenda.color),
                   ('Confianza ML', prenda.confianzaTexto),
                   ('Clima', AppConstants.etiquetaMomento(prenda.momento)),
@@ -255,7 +255,7 @@ class DetallePrendaScreen extends StatelessWidget {
         backgroundColor: StyleMeTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Eliminar prenda', style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontWeight: FontWeight.bold)),
-        content: Text('¿Seguro que quieres eliminar "${prenda.tipo}"? Esta acción no se puede deshacer.',
+        content: Text('¿Seguro que quieres eliminar "${AppConstants.etiquetaTipo(prenda.tipo)}"? Esta acción no se puede deshacer.',
             style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 13)),
         actions: [
           TextButton(

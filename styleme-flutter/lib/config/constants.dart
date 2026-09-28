@@ -62,12 +62,36 @@ class AppConstants {
     'beige', 'cafe',
   ];
 
-  // Tipos de prendas del modelo YOLO
-  static const List<String> tiposPrendas = [
-    'T-shirt', 'blazer', 'blouse', 'body', 'dress', 'glove',
-    'hat', 'hoodie', 'long sleeve', 'outwear', 'pants', 'polo',
-    'shirt', 'shoe', 'shorts', 'skirt', 'top', 'undershirt',
-  ];
+  // Clases del modelo YOLO (valor que guarda y filtra el backend, en inglés)
+  // → etiqueta visible en español.
+  static const Map<String, String> tipoEtiquetas = {
+    'T-shirt': 'Camiseta',
+    'blazer': 'Blazer',
+    'blouse': 'Blusa',
+    'body': 'Body',
+    'dress': 'Vestido',
+    'glove': 'Guantes',
+    'hat': 'Sombrero',
+    'hoodie': 'Buzo',
+    'long sleeve': 'Manga larga',
+    'not sure': 'Sin identificar',
+    'other': 'Otro',
+    'outwear': 'Abrigo',
+    'pants': 'Pantalón',
+    'polo': 'Polo',
+    'shirt': 'Camisa',
+    'shoe': 'Calzado',
+    'shorts': 'Pantaloneta',
+    'skirt': 'Falda',
+    'top': 'Top',
+    'undershirt': 'Camiseta interior',
+  };
+
+  // Etiqueta en español de un tipo; si no se conoce, el valor crudo.
+  static String etiquetaTipo(String? tipo) {
+    if (tipo == null || tipo.isEmpty) return tipoEtiquetas['other']!;
+    return tipoEtiquetas[tipo] ?? tipo;
+  }
 
   // Duración de animaciones
   static const Duration animFast = Duration(milliseconds: 200);
