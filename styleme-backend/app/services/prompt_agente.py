@@ -8,6 +8,7 @@ a correr la verificación.
 """
 
 from app.models.momento import momento_de_prenda
+from app.models.tipo_prenda import etiqueta_tipo
 
 # Umbrales para decidir qué momentos ("soleado"/"lluvioso"/"ambos") son
 # apropiados según el clima esperado del evento (ver filtrar_prendas).
@@ -61,8 +62,10 @@ EXPRESION_POR_CONFIANZA = {
 def construir_mensaje_usuario(descripcion_evento: str, clima: dict, prendas: list[dict]) -> str:
     marca = " (derivado)" if clima["fuente"] == "climatologia" else ""
     expresion = EXPRESION_POR_CONFIANZA.get(clima["confianza"], "la proyeccion indica")
+    # etiqueta_tipo() es solo para el texto que ve el LLM: p['tipo'] (inglés)
+    # es el que se guarda y se devuelve a la app, sin tocar.
     lineas = "\n".join(
-        f"{i} {p['tipo']} {p['color']} {momento_de_prenda(p)}" for i, p in enumerate(prendas)
+        f"{i} {etiqueta_tipo(p['tipo'])} {p['color']} {momento_de_prenda(p)}" for i, p in enumerate(prendas)
     )
     return f"""EVENTO: {descripcion_evento}
 LUGAR: {clima["lugar"]}

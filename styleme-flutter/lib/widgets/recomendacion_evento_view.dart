@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/agente_evento_controller.dart';
 import 'package:styleme/models/recomendacion_evento_model.dart';
@@ -341,7 +342,7 @@ class _RecomendacionEventoViewState extends State<RecomendacionEventoView> {
         ),
         const SizedBox(height: 4),
         Text(
-          '${p.tipo} ${p.color}',
+          '${AppConstants.etiquetaTipo(p.tipo)} ${p.color}',
           style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 11),
           textAlign: TextAlign.center,
           maxLines: 1,

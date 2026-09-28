@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:styleme/config/api_config.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/models/outfit_model.dart';
 
@@ -256,7 +257,7 @@ class OutfitVisualCard extends StatelessWidget {
       );
     }
 
-    final tipo = (p['tipo'] as String? ?? '').replaceAll('-', ' ');
+    final tipo = AppConstants.etiquetaTipo(p['tipo'] as String?);
     final color = p['color'] as String? ?? '';
     final score = (p['score'] as num?)?.toDouble() ??
         (p['confianza'] as num?)?.toDouble() ??

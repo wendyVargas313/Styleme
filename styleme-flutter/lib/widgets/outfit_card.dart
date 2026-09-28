@@ -99,7 +99,7 @@ class OutfitCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  prenda.tipo,
+                  AppConstants.etiquetaTipo(prenda.tipo),
                   style: GoogleFonts.poppins(
                     color: StyleMeTheme.textPrimary,
                     fontWeight: FontWeight.w600,
@@ -176,7 +176,7 @@ class OutfitCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  comp.prenda.tipo,
+                  AppConstants.etiquetaTipo(comp.prenda.tipo),
                   style: GoogleFonts.poppins(
                     color: StyleMeTheme.textPrimary,
                     fontSize: 13,

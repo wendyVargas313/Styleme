@@ -180,7 +180,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
                       ),
                       child: Text('BASE', style: GoogleFonts.poppins(color: StyleMeTheme.primary, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                     ),
-                  Text(prenda.tipo, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(AppConstants.etiquetaTipo(prenda.tipo), style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   _infoChip(prenda.color, Icons.palette),
                   const SizedBox(height: 4),
@@ -240,7 +240,7 @@ class _OutfitDetalleScreenState extends State<OutfitDetalleScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(comp.prenda.tipo, style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(AppConstants.etiquetaTipo(comp.prenda.tipo), style: GoogleFonts.poppins(color: StyleMeTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
                     Text('${comp.prenda.color} • ${AppConstants.etiquetaMomento(comp.prenda.momento)}',
                         style: GoogleFonts.poppins(color: StyleMeTheme.textSecondary, fontSize: 12)),
                   ],

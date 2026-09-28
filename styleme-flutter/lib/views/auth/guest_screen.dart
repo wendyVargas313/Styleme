@@ -325,7 +325,7 @@ class _GuestScreenState extends State<GuestScreen> {
                                   bottom: Radius.circular(10)),
                             ),
                             child: Text(
-                              '${p['tipo']} • ${conf.toStringAsFixed(0)}%',
+                              '${AppConstants.etiquetaTipo(p['tipo'] as String?)} • ${conf.toStringAsFixed(0)}%',
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 8,
@@ -434,7 +434,7 @@ class _GuestScreenState extends State<GuestScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  p['tipo'] ?? '',
+                  AppConstants.etiquetaTipo(p['tipo'] as String?),
                   style: GoogleFonts.poppins(
                       color: StyleMeTheme.textPrimary,
                       fontWeight: FontWeight.w600),

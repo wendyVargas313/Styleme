@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:styleme/config/constants.dart';
 import 'package:styleme/config/theme.dart';
 import 'package:styleme/controllers/auth_controller.dart';
 import 'package:styleme/controllers/guardarropa_controller.dart';
@@ -507,7 +508,7 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 16),
               // Info prenda base
               Text(
-                '${outfit.tipoPrendaBase} · ${outfit.colorPrendaBase}',
+                '${AppConstants.etiquetaTipo(outfit.tipoPrendaBase)} · ${outfit.colorPrendaBase}',
                 style: GoogleFonts.poppins(
                   color: StyleMeTheme.textPrimary,
                   fontWeight: FontWeight.bold,
@@ -821,7 +822,7 @@ class _OutfitIACard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  outfit.tipoPrendaBase,
+                  AppConstants.etiquetaTipo(outfit.tipoPrendaBase),
                   style: GoogleFonts.poppins(
                     color: StyleMeTheme.textPrimary,
                     fontWeight: FontWeight.w600,
